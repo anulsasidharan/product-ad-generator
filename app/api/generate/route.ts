@@ -60,7 +60,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const { optimizedPrompt, suggestedModel } = await agent.optimizePrompt(userPrompt, productContext);
     const modelKey = model ?? suggestedModel;
-    const effectiveModel = modelKey === "flux-schnell" ? "flux-schnell" : "flux-schnell";
+    const effectiveModel = modelKey === "flux-pro" ? "flux-pro" : "flux-schnell";
 
     const plans = await agent.generateVariants(optimizedPrompt, productContext, variantCount);
 

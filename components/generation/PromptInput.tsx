@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Settings2, Sparkles, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,8 @@ function useDebounced<T>(value: T, ms: number): T {
   return debounced;
 }
 
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+
 export function PromptInput({ productContext, onGenerate, suggestions, isGenerating }: PromptInputProps) {
   const [prompt, setPrompt] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -82,44 +84,50 @@ export function PromptInput({ productContext, onGenerate, suggestions, isGenerat
 
   return (
     <Card className="w-full max-w-xl border-slate-200 shadow-sm">
-      <CardHeader className="flex flex-row items-center gap-2 space-y-0">
-        <Sparkles className="h-5 w-5 text-primary-600" aria-hidden />
-        <CardTitle className="text-lg">Describe your ad</CardTitle>
+      <CardHeader className="flex flex-row items-center gap-2.5 space-y-0 pb-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50">
+          <Sparkles className="h-4 w-4 text-violet-600" aria-hidden />
+        </div>
+        <CardTitle className="text-base font-semibold">Describe your ad</CardTitle>
       </CardHeader>
+
       <CardContent className="space-y-3">
+        {/* Prompt textarea */}
         <div>
-          <label htmlFor="ad-prompt" className="sr-only">
-            Ad prompt
-          </label>
+          <label htmlFor="ad-prompt" className="sr-only">Ad prompt</label>
           <textarea
             id="ad-prompt"
             rows={3}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             disabled={isGenerating}
-            placeholder="Describe the vibe you want (e.g., 'luxury hotel lobby')"
+            placeholder={`Describe the vibe you want (e.g. "luxury hotel lobby")`}
             className={cn(
-              "w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none",
+              "w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none leading-relaxed",
               "focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-500/30",
               "disabled:cursor-not-allowed disabled:opacity-60",
+              "placeholder:text-slate-400",
             )}
           />
         </div>
 
+        {/* Live preview */}
         <div
-          className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+          className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5 text-sm leading-relaxed text-slate-600"
           aria-live="polite"
         >
+          <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Preview · </span>
           {previewLine(debouncedPrompt, productContext.productType)}
         </div>
 
-        <div className="flex flex-wrap gap-2" role="list">
+        {/* Suggestion chips */}
+        <div className="flex flex-wrap gap-1.5" role="list">
           {chips.map((chip) => (
             <button
               key={chip}
               type="button"
               role="listitem"
-              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-primary-400 hover:text-primary-800"
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-primary-400 hover:bg-primary-50 hover:text-primary-800 disabled:opacity-50"
               onClick={() => setPrompt((p) => (p ? `${p}, ${chip}` : chip))}
               disabled={isGenerating}
             >
@@ -128,57 +136,59 @@ export function PromptInput({ productContext, onGenerate, suggestions, isGenerat
           ))}
         </div>
 
+        {/* Advanced toggle */}
         <button
           type="button"
-          className="text-sm font-medium text-primary-700 underline-offset-2 hover:underline"
+          className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-primary-700 transition-colors"
           onClick={() => setShowAdvanced((v) => !v)}
           aria-expanded={showAdvanced}
         >
+          <Settings2 className="h-3.5 w-3.5" aria-hidden />
           {showAdvanced ? "Hide advanced options" : "Advanced options"}
         </button>
 
         {showAdvanced && (
-          <div className="grid gap-3 rounded-lg border bg-slate-50 p-3 sm:grid-cols-3">
+          <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600" htmlFor="aspect-ratio">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400" htmlFor="aspect-ratio">
                 Aspect ratio
               </label>
               <select
                 id="aspect-ratio"
-                className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
+                className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
                 value={aspectRatio}
                 onChange={(e) => setAspectRatio(e.target.value as AspectRatio)}
                 disabled={isGenerating}
               >
-                <option value="1:1">1:1</option>
-                <option value="16:9">16:9</option>
-                <option value="9:16">9:16</option>
-                <option value="4:5">4:5</option>
+                <option value="1:1">1:1 (Square)</option>
+                <option value="16:9">16:9 (Wide)</option>
+                <option value="9:16">9:16 (Story)</option>
+                <option value="4:5">4:5 (Portrait)</option>
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600" htmlFor="variants-count">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400" htmlFor="variants-count">
                 Variants
               </label>
               <select
                 id="variants-count"
-                className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
+                className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
                 value={variants}
                 onChange={(e) => setVariants(Number(e.target.value))}
                 disabled={isGenerating}
               >
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={3}>3</option>
+                <option value={1}>1 variant</option>
+                <option value={2}>2 variants</option>
+                <option value={3}>3 variants</option>
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600" htmlFor="model-select">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400" htmlFor="model-select">
                 Model
               </label>
               <select
                 id="model-select"
-                className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
+                className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
                 value={model}
                 onChange={(e) => setModel(e.target.value as GenerationModelChoice)}
                 disabled={isGenerating}
@@ -191,15 +201,25 @@ export function PromptInput({ productContext, onGenerate, suggestions, isGenerat
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex justify-end border-t bg-slate-50/50 px-6 py-3">
-        <Button type="button" onClick={handleGenerate} disabled={!prompt.trim() || isGenerating} className="min-w-[140px]">
+
+      <CardFooter className="flex items-center justify-between border-t bg-slate-50/60 px-4 py-3">
+        <span className="text-xs text-slate-400">{isMac ? "⌘" : "Ctrl"}+↵ to generate</span>
+        <Button
+          type="button"
+          onClick={handleGenerate}
+          disabled={!prompt.trim() || isGenerating}
+          className="min-w-[140px] gap-2"
+        >
           {isGenerating ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               Generating…
             </>
           ) : (
-            "Generate"
+            <>
+              <Wand2 className="h-4 w-4" aria-hidden />
+              Generate
+            </>
           )}
         </Button>
       </CardFooter>

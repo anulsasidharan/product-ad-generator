@@ -166,6 +166,8 @@ export function ChatInterface({
             imageUrl: generation.imageUrl,
             parameters: {
               ...(productImageUrl ? { productImageUrl } : {}),
+              // The current generation image serves as the compositing background
+              backgroundUrl: generation.imageUrl,
             },
           },
         }),
@@ -173,16 +175,19 @@ export function ChatInterface({
 
       if (!res.ok) {
         const bodyText = await res.text();
-        let msg = bodyText;
-        try {
-          const j = JSON.parse(bodyText) as { error?: string };
-          if (j.error) {
-            msg = j.error;
+        let msg = "Something went wrong. Please try again.";
+        // Only attempt JSON parse if it doesn't look like an HTML error page
+        if (!bodyText.trim().startsWith("<")) {
+          try {
+            const j = JSON.parse(bodyText) as { error?: string };
+            if (j.error) {
+              msg = j.error;
+            }
+          } catch {
+            // keep the friendly default
           }
-        } catch {
-          // use raw text
         }
-        throw new Error(msg || "Iteration request failed");
+        throw new Error(msg);
       }
       if (!res.body) {
         throw new Error("No response body");
