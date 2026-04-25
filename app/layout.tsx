@@ -13,6 +13,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "AI-Powered Product Ad Generator",
   description: "Generate product ads with AI and natural language prompts.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
