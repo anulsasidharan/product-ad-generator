@@ -1,7 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { streamText } from "ai";
 
-import { ClaudeAgent } from "@/lib/ai/claude-agent";
+import { ClaudeAgent, DEFAULT_MODEL } from "@/lib/ai/claude-agent";
 import { ImageGenerator } from "@/lib/ai/image-generator";
 import { errorResponse } from "@/lib/api-response";
 import { uploadImage } from "@/lib/blob-storage";
@@ -65,7 +65,7 @@ export async function POST(request: Request): Promise<Response> {
           const iteration = await agent.interpretIteration(userMessage, state, history);
 
           const apiKey = process.env.ANTHROPIC_API_KEY;
-          const streamModelId = process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-20241022";
+          const streamModelId = process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
 
           if (apiKey) {
             try {

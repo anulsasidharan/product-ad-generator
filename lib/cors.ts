@@ -1,10 +1,15 @@
 export function corsHeaders(): Record<string, string> {
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? "*";
-  return {
-    "Access-Control-Allow-Origin": origin,
+  const origin = process.env.NEXT_PUBLIC_APP_URL;
+  const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
+  // Only set the header when an explicit allowlist origin is configured.
+  // No fallback to "*" — omitting the header enforces same-origin policy.
+  if (origin) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
 }
 
 export function mergeCors(headers?: HeadersInit): Headers {

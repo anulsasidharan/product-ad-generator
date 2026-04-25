@@ -55,7 +55,7 @@ Rules:
 - regenerate: parameters { "modifiedPrompt": string, "reason": string }
 - clarify: parameters { "question": string, "options": string[] }`;
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+export const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const CACHE_MAX = 50;
 
 function sleep(ms: number): Promise<void> {
@@ -72,6 +72,14 @@ function stripJsonFence(text: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractTextBlock(response: Anthropic.Message): string {
+  const block = response.content[0];
+  if (!block || block.type !== "text") {
+    throw new ApiError("Unexpected Claude response", 502, "AI_SERVICE_ERROR");
+  }
+  return block.text;
 }
 
 function parseProductAnalysis(raw: string): ProductAnalysis {
@@ -315,10 +323,12 @@ export class ClaudeAgent {
       this.promptCache.delete(key);
     }
     this.promptCache.set(key, value);
-    while (this.promptCache.size > CACHE_MAX) {
+    for (let i = 0; i < CACHE_MAX && this.promptCache.size > CACHE_MAX; i++) {
       const first = this.promptCache.keys().next().value;
       if (first !== undefined) {
         this.promptCache.delete(first);
+      } else {
+        break;
       }
     }
   }
@@ -354,12 +364,7 @@ export class ClaudeAgent {
           ],
         });
 
-        const block = response.content[0];
-        if (!block || block.type !== "text") {
-          throw new ApiError("Unexpected response from Claude", 502, "AI_SERVICE_ERROR");
-        }
-
-        return parseProductAnalysis(block.text);
+        return parseProductAnalysis(extractTextBlock(response));
       } catch (error) {
         lastError = error;
         if (error instanceof ApiError) {
@@ -403,12 +408,7 @@ User's request: ${userPrompt}`;
       messages: [{ role: "user", content: userContent }],
     });
 
-    const block = response.content[0];
-    if (!block || block.type !== "text") {
-      throw new ApiError("Unexpected response from Claude", 502, "AI_SERVICE_ERROR");
-    }
-
-    const optimizedPrompt = block.text.trim();
+    const optimizedPrompt = extractTextBlock(response).trim();
     const suggestedModel = suggestModelFromPrompt(userPrompt);
     const result: OptimizePromptResult = { optimizedPrompt, suggestedModel };
     this.touchCache(key, result);
@@ -439,12 +439,7 @@ Produce exactly ${count} variants with different composition/lighting/mood while
       messages: [{ role: "user", content: userContent }],
     });
 
-    const block = response.content[0];
-    if (!block || block.type !== "text") {
-      throw new ApiError("Unexpected response from Claude", 502, "AI_SERVICE_ERROR");
-    }
-
-    return parseVariantPlans(block.text, count);
+    return parseVariantPlans(extractTextBlock(response), count);
   }
 
   /**
@@ -477,11 +472,6 @@ User just said: '${userMessage}'`;
       messages: [{ role: "user", content: userContent }],
     });
 
-    const block = response.content[0];
-    if (!block || block.type !== "text") {
-      throw new ApiError("Unexpected response from Claude", 502, "AI_SERVICE_ERROR");
-    }
-
-    return parseIterationAction(block.text);
+    return parseIterationAction(extractTextBlock(response));
   }
 }

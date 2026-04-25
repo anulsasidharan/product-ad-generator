@@ -2,6 +2,17 @@ import sharp from "sharp";
 
 import { ApiError } from "@/lib/api-response";
 
+const IMAGE_DEFAULTS = {
+  MAX_COVER: 0.72,
+  TEXT_FONT_SIZE: 48,
+  TEXT_MIN_FONT_SIZE: 8,
+  TEXT_MAX_FONT_SIZE: 200,
+  PLACEHOLDER_DIM: 16,
+  PLACEHOLDER_BLUR_SIGMA: 6,
+  JPEG_QUALITY: 85,
+  PLACEHOLDER_QUALITY: 60,
+} as const;
+
 async function fetchBuffer(url: string): Promise<Buffer> {
   const res = await fetch(url);
   if (!res.ok) {
@@ -35,7 +46,7 @@ export async function compositeProductOnBackground(
     throw new ApiError("Could not read background dimensions", 400, "INVALID_IMAGE");
   }
 
-  const maxCover = options?.maxCover ?? 0.72;
+  const maxCover = options?.maxCover ?? IMAGE_DEFAULTS.MAX_COVER;
   const maxW = Math.floor(bgWidth * maxCover);
   const maxH = Math.floor(bgHeight * maxCover);
 
@@ -109,6 +120,7 @@ export interface TextOverlayOptions {
 
 /**
  * Renders text onto an image using an SVG overlay.
+ * Numeric position values are clamped to image bounds to prevent SVG renderer issues.
  */
 export async function addTextOverlay(
   imageUrl: string,
@@ -123,12 +135,17 @@ export async function addTextOverlay(
     throw new ApiError("Could not read image dimensions", 400, "INVALID_IMAGE");
   }
 
+  // Clamp numeric params to valid bounds before interpolation into SVG
+  const safeX = Math.max(0, Math.min(Math.floor(options.position.x), width));
+  const safeY = Math.max(0, Math.min(Math.floor(options.position.y), height));
+  const safeFontSize = Math.max(
+    IMAGE_DEFAULTS.TEXT_MIN_FONT_SIZE,
+    Math.min(IMAGE_DEFAULTS.TEXT_MAX_FONT_SIZE, IMAGE_DEFAULTS.TEXT_FONT_SIZE),
+  );
+
   const safeText = escapeXml(text);
-  const svg = `
-<svg width="${width}" height="${height}">
-  <text x="${options.position.x}" y="${options.position.y}" font-family="${escapeXml(
-    options.font,
-  )}" font-size="48" fill="${escapeXml(options.color)}">${safeText}</text>
+  const svg = `<svg width="${width}" height="${height}">
+  <text x="${safeX}" y="${safeY}" font-family="${escapeXml(options.font)}" font-size="${safeFontSize}" fill="${escapeXml(options.color)}">${safeText}</text>
 </svg>`;
 
   try {
@@ -168,10 +185,14 @@ export async function generateThumbnail(
         fit: "inside",
         withoutEnlargement: false,
       })
-      .jpeg({ quality: 85 })
+      .jpeg({ quality: IMAGE_DEFAULTS.JPEG_QUALITY })
       .toBuffer();
 
-    const placeholderBuf = await sharp(buffer).resize(16, 16, { fit: "cover" }).blur(6).jpeg({ quality: 60 }).toBuffer();
+    const placeholderBuf = await sharp(buffer)
+      .resize(IMAGE_DEFAULTS.PLACEHOLDER_DIM, IMAGE_DEFAULTS.PLACEHOLDER_DIM, { fit: "cover" })
+      .blur(IMAGE_DEFAULTS.PLACEHOLDER_BLUR_SIGMA)
+      .jpeg({ quality: IMAGE_DEFAULTS.PLACEHOLDER_QUALITY })
+      .toBuffer();
 
     const placeholderDataUrl = `data:image/jpeg;base64,${placeholderBuf.toString("base64")}`;
 

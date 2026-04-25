@@ -1,12 +1,12 @@
 "use client";
 
 import { Canvas, FabricImage, Textbox } from "fabric";
-import { Redo2, Type, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { Eye, EyeOff, FileImage, Redo2, Type, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { CanvasState, ExportFormat, Generation } from "@/lib/types";
+import type { CanvasState, ExportFormat, Generation, Layer, LayerType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface CanvasEditorProps {
@@ -26,43 +26,56 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
   const [layers, setLayers] = useState<{ id: string; label: string; visible: boolean }[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [historyLength, setHistoryLength] = useState(0);
 
   const pushHistory = useCallback(() => {
     const c = fabricRef.current;
-    if (!c) {
-      return;
-    }
+    if (!c) return;
     const json = JSON.stringify(c.toJSON());
     historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
     historyRef.current.push(json);
     historyIndexRef.current = historyRef.current.length - 1;
+    setHistoryIndex(historyIndexRef.current);
+    setHistoryLength(historyRef.current.length);
   }, []);
 
   const syncLayers = useCallback(() => {
     const c = fabricRef.current;
-    if (!c) {
-      return;
-    }
+    if (!c) return;
+    const fabricObjects = c.getObjects();
     setLayers(
-      c.getObjects().map((o, i) => ({
+      fabricObjects.map((o, i) => ({
         id: String(i),
         label: o.type ?? `object-${i}`,
         visible: o.visible !== false,
       })),
     );
+    const typedLayers: Layer[] = fabricObjects.map((o, i) => {
+      const isText = o.type === "textbox" || o.type === "text";
+      const layerType: LayerType = isText ? "text" : "image";
+      return {
+        id: String(i),
+        type: layerType,
+        position: { x: Math.round(o.left ?? 0), y: Math.round(o.top ?? 0) },
+        scale: o.scaleX ?? 1,
+        rotation: o.angle ?? 0,
+        content: isText
+          ? { kind: "text" as const, text: (o as Textbox).text ?? "" }
+          : { kind: "image" as const, url: "" },
+      };
+    });
     onUpdate({
-      layers: [],
+      layers: typedLayers,
       dimensions: { width: c.getWidth(), height: c.getHeight() },
-      history: [{ layers: [], dimensions: { width: c.getWidth(), height: c.getHeight() } }],
+      history: [{ layers: typedLayers, dimensions: { width: c.getWidth(), height: c.getHeight() } }],
       historyIndex: historyIndexRef.current,
     });
   }, [onUpdate]);
 
   useEffect(() => {
     const el = canvasElRef.current;
-    if (!el) {
-      return;
-    }
+    if (!el) return;
 
     const canvas = new Canvas(el, {
       width: W,
@@ -111,39 +124,35 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
 
   const undo = useCallback(() => {
     const c = fabricRef.current;
-    if (!c || historyIndexRef.current <= 0) {
-      return;
-    }
+    if (!c || historyIndexRef.current <= 0) return;
     historyIndexRef.current -= 1;
     const json = historyRef.current[historyIndexRef.current];
     if (json) {
       void c.loadFromJSON(json).then(() => {
         c.requestRenderAll();
         syncLayers();
+        setHistoryIndex(historyIndexRef.current);
       });
     }
   }, [syncLayers]);
 
   const redo = useCallback(() => {
     const c = fabricRef.current;
-    if (!c || historyIndexRef.current >= historyRef.current.length - 1) {
-      return;
-    }
+    if (!c || historyIndexRef.current >= historyRef.current.length - 1) return;
     historyIndexRef.current += 1;
     const json = historyRef.current[historyIndexRef.current];
     if (json) {
       void c.loadFromJSON(json).then(() => {
         c.requestRenderAll();
         syncLayers();
+        setHistoryIndex(historyIndexRef.current);
       });
     }
   }, [syncLayers]);
 
   const addText = useCallback(() => {
     const c = fabricRef.current;
-    if (!c) {
-      return;
-    }
+    if (!c) return;
     const text = new Textbox("Headline", {
       left: W / 2 - 120,
       top: 80,
@@ -160,9 +169,7 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
 
   const zoom = useCallback((factor: number) => {
     const c = fabricRef.current;
-    if (!c) {
-      return;
-    }
+    if (!c) return;
     const z = c.getZoom() * factor;
     c.setZoom(Math.min(2, Math.max(0.5, z)));
     c.requestRenderAll();
@@ -171,9 +178,7 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
   const exportCanvas = useCallback(
     (format: ExportFormat) => {
       const c = fabricRef.current;
-      if (!c) {
-        return;
-      }
+      if (!c) return;
       const fabricFormat = format === "jpg" ? "jpeg" : format;
       const quality = format === "png" ? 1 : 0.92;
       const dataUrl = c.toDataURL({ format: fabricFormat, multiplier: 1, quality });
@@ -189,13 +194,9 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
   const toggleLayer = useCallback(
     (index: number) => {
       const c = fabricRef.current;
-      if (!c) {
-        return;
-      }
+      if (!c) return;
       const obj = c.item(index);
-      if (!obj) {
-        return;
-      }
+      if (!obj) return;
       obj.visible = !obj.visible;
       c.requestRenderAll();
       syncLayers();
@@ -203,64 +204,134 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
     [syncLayers],
   );
 
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < historyLength - 1;
+
   return (
     <Card className="w-full border-slate-200 shadow-sm">
-      <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-lg">Canvas</CardTitle>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={addText}>
-            <Type className="mr-1 h-4 w-4" />
-            Add Text
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3">
+        <CardTitle className="text-base font-semibold">Canvas</CardTitle>
+
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={addText}
+            className="gap-1.5 text-xs"
+            aria-label="Add text layer"
+          >
+            <Type className="h-3.5 w-3.5" aria-hidden />
+            Text
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={undo}>
-            <Undo2 className="h-4 w-4" />
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={redo}>
-            <Redo2 className="h-4 w-4" />
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => zoom(1.1)}>
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => zoom(1 / 1.1)}>
-            <ZoomOut className="h-4 w-4" />
-          </Button>
+
+          <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={undo}
+              disabled={!canUndo}
+              aria-label="Undo"
+              className="h-7 w-7 p-0"
+            >
+              <Undo2 className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={redo}
+              disabled={!canRedo}
+              aria-label="Redo"
+              className="h-7 w-7 p-0"
+            >
+              <Redo2 className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => zoom(1.1)}
+              aria-label="Zoom in"
+              className="h-7 w-7 p-0"
+            >
+              <ZoomIn className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => zoom(1 / 1.1)}
+              aria-label="Zoom out"
+              className="h-7 w-7 p-0"
+            >
+              <ZoomOut className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+          </div>
         </div>
       </CardHeader>
+
       <CardContent className="flex flex-col gap-4 lg:flex-row">
-        <div className="overflow-auto rounded-md border bg-white p-2">
+        {/* Canvas viewport */}
+        <div className="overflow-auto rounded-xl border border-slate-200 bg-white p-2">
           <canvas ref={canvasElRef} className="touch-none" />
         </div>
-        <div className="w-full shrink-0 space-y-3 lg:w-56">
-          <p className="text-sm font-medium text-slate-800">Layers</p>
-          <ul className="space-y-1 text-sm">
-            {layers.map((layer, i) => (
-              <li key={layer.id}>
-                <button
+
+        {/* Sidebar: layers + export */}
+        <div className="w-full shrink-0 space-y-4 lg:w-52">
+          {/* Layers */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Layers</p>
+            {layers.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No layers yet</p>
+            ) : (
+              <ul className="space-y-1">
+                {layers.map((layer, i) => (
+                  <li key={layer.id}>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-left text-xs transition hover:bg-slate-50",
+                        !layer.visible && "opacity-50",
+                      )}
+                      onClick={() => toggleLayer(i)}
+                      aria-label={`Toggle layer ${layer.label} visibility`}
+                    >
+                      <span className="truncate font-medium text-slate-700">{layer.label}</span>
+                      {layer.visible ? (
+                        <Eye className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                      ) : (
+                        <EyeOff className="h-3.5 w-3.5 shrink-0 text-slate-300" aria-hidden />
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Export */}
+          <div className="border-t pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Export</p>
+            <div className="flex flex-col gap-1.5">
+              {(["png", "jpg", "webp"] as ExportFormat[]).map((fmt) => (
+                <Button
+                  key={fmt}
                   type="button"
-                  className={cn(
-                    "flex w-full items-center justify-between rounded border px-2 py-1 text-left hover:bg-slate-50",
-                    !layer.visible && "opacity-50",
-                  )}
-                  onClick={() => toggleLayer(i)}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => exportCanvas(fmt)}
+                  className="justify-start gap-2 text-xs"
                 >
-                  <span className="truncate">{layer.label}</span>
-                  <span className="text-xs text-slate-500">{layer.visible ? "on" : "off"}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <div className="space-y-2 border-t pt-3">
-            <p className="text-xs font-medium text-slate-600">Export</p>
-            <div className="flex flex-col gap-1">
-              <Button type="button" size="sm" variant="outline" onClick={() => exportCanvas("png")}>
-                PNG
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => exportCanvas("jpg")}>
-                JPG
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => exportCanvas("webp")}>
-                WebP
-              </Button>
+                  <FileImage className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+                  {fmt.toUpperCase()}
+                </Button>
+              ))}
             </div>
           </div>
         </div>

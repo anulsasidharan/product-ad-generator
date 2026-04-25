@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, RotateCcw, Upload } from "lucide-react";
+import { CheckCircle2, ImagePlus, Loader2, RotateCcw, Upload } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -185,10 +185,18 @@ export function ProductUploader({
 
   return (
     <Card className="w-full max-w-xl border-slate-200 shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-lg">Product image</CardTitle>
+      <CardHeader className="flex flex-row items-center gap-2.5 space-y-0 pb-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50">
+          <ImagePlus className="h-4 w-4 text-primary-600" aria-hidden />
+        </div>
+        <CardTitle className="text-base font-semibold">Product image</CardTitle>
+        {phase === "success" && (
+          <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-500" aria-hidden />
+        )}
       </CardHeader>
+
       <CardContent className="space-y-4">
+        {/* Drop zone */}
         <div
           ref={zoneRef}
           role="button"
@@ -210,8 +218,10 @@ export function ProductUploader({
           onDrop={onDrop}
           onClick={() => !busy && inputRef.current?.click()}
           className={cn(
-            "flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-            phase === "dragging" ? "border-primary-500 bg-primary-50" : "border-slate-300 bg-slate-50 hover:bg-slate-100",
+            "flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+            phase === "dragging"
+              ? "border-primary-400 bg-primary-50"
+              : "border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100",
             busy && "pointer-events-none opacity-70",
           )}
         >
@@ -224,22 +234,30 @@ export function ProductUploader({
             onChange={onBrowse}
             aria-hidden
           />
+
           {busy ? (
-            <div className="flex flex-col items-center gap-2 text-slate-600">
-              <Loader2 className="h-8 w-8 animate-spin" aria-hidden />
-              <span>{phase === "uploading" ? "Uploading…" : "Analyzing product…"}</span>
+            <div className="flex flex-col items-center gap-3 text-slate-500">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-500" aria-hidden />
+              <span className="text-sm font-medium">
+                {phase === "uploading" ? "Uploading…" : "Analysing product…"}
+              </span>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2 text-center text-slate-600">
-              <Upload className="h-8 w-8 text-primary-600" aria-hidden />
-              <span className="font-medium text-slate-800">Drop image or click to upload</span>
-              <span className="text-sm">PNG, JPG, or WebP · max {maxSizeMB}MB</span>
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm border border-slate-200">
+                <Upload className="h-6 w-6 text-primary-600" aria-hidden />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Drop image or click to upload</p>
+                <p className="mt-0.5 text-xs text-slate-500">PNG, JPG, or WebP · max {maxSizeMB} MB</p>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="product-url" className="text-sm font-medium text-slate-700">
+        {/* URL input */}
+        <div className="space-y-1.5">
+          <label htmlFor="product-url" className="text-xs font-medium text-slate-500 uppercase tracking-wide">
             Or paste image URL
           </label>
           <div className="flex gap-2">
@@ -249,42 +267,57 @@ export function ProductUploader({
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder="https://…"
               disabled={busy}
-              className="flex-1"
+              className="flex-1 text-sm"
             />
-            <Button type="button" variant="outline" disabled={busy} onClick={() => void analyzeFromUrl()}>
-              Analyze URL
+            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void analyzeFromUrl()}>
+              Analyse
             </Button>
           </div>
         </div>
 
+        {/* Error state */}
         {phase === "error" && errorMessage && (
-          <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">
             <span>{errorMessage}</span>
-            <Button type="button" size="sm" variant="ghost" onClick={reset} className="shrink-0 gap-1">
-              <RotateCcw className="h-4 w-4" aria-hidden />
+            <Button type="button" size="sm" variant="ghost" onClick={reset} className="shrink-0 gap-1 text-red-700 hover:text-red-900">
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
               Retry
             </Button>
           </div>
         )}
 
+        {/* Success state */}
         {phase === "success" && analysis && previewUrl && (
-          <div className="space-y-3 rounded-lg border bg-white p-3">
-            <div className="flex gap-3">
-              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border bg-slate-100">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="flex gap-3 p-3">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
                 <Image src={previewUrl} alt="" fill className="object-cover" sizes="80px" unoptimized />
               </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900">{analysis.productType}</p>
-                <p className="text-xs text-slate-600">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">{analysis.productType}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
                   {analysis.attributes.style} · {analysis.attributes.category}
                 </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {analysis.attributes.colors.slice(0, 3).map((c) => (
+                    <span key={c} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                      {c}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
-            <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Suggestions</p>
-              <ul className="list-inside list-disc text-sm text-slate-700">
-                {analysis.suggestions.slice(0, 4).map((s) => (
-                  <li key={s.prompt}>{s.prompt}</li>
+
+            <div className="border-t bg-slate-50 px-3 py-2.5">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                AI suggestions
+              </p>
+              <ul className="space-y-1">
+                {analysis.suggestions.slice(0, 3).map((s) => (
+                  <li key={s.prompt} className="flex items-start gap-1.5 text-xs text-slate-600">
+                    <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" />
+                    {s.prompt}
+                  </li>
                 ))}
               </ul>
             </div>

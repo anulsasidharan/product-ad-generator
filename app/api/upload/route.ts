@@ -15,7 +15,12 @@ export async function POST(request: Request): Promise<Response> {
     const ip = getClientIdentifier(request);
     await checkRateLimit(ip, ANALYZE_LIMIT, "1 m");
 
-    const form = await request.formData();
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      return jsonResponse({ success: false, error: "Invalid form data", code: "INVALID_FORM_DATA" }, 400);
+    }
     const file = form.get("file");
     if (!(file instanceof File)) {
       return jsonResponse({ success: false, error: "Missing file field", code: "MISSING_FILE" }, 400);

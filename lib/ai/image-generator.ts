@@ -4,6 +4,7 @@ import { ApiError } from "@/lib/api-response";
 import type { ImageModelKey } from "@/lib/types";
 
 const FLUX_SCHNELL = "black-forest-labs/flux-schnell";
+const FLUX_PRO = "black-forest-labs/flux-pro";
 /** Default Replicate model for background removal; override with REPLICATE_BG_MODEL if needed. */
 const DEFAULT_BG_MODEL = "cjwbw/rembg";
 
@@ -75,16 +76,13 @@ export class ImageGenerator {
       seed?: number;
     },
   ): Promise<string[]> {
-    if (model !== "flux-schnell") {
-      throw new ApiError(`Unsupported model for generate(): ${model}`, 400, "UNSUPPORTED_MODEL");
-    }
-
+    const replicateModel = model === "flux-pro" ? FLUX_PRO : FLUX_SCHNELL;
     const aspectRatio = options?.aspectRatio ?? "1:1";
     const numOutputs = options?.numOutputs ?? 1;
 
     const runOnce = async () => {
       const output = await withTimeout(
-        this.replicate.run(FLUX_SCHNELL as `${string}/${string}`, {
+        this.replicate.run(replicateModel as `${string}/${string}`, {
           input: {
             prompt,
             aspect_ratio: aspectRatio,
@@ -113,7 +111,7 @@ export class ImageGenerator {
         if (attempt === MAX_ATTEMPTS) {
           break;
         }
-        await sleep(500 * 2 ** (attempt - 1));
+        await sleep(500 * 2 ** (attempt - 1) + Math.random() * 200);
       }
     }
 
@@ -153,7 +151,7 @@ export class ImageGenerator {
         if (attempt === MAX_ATTEMPTS) {
           break;
         }
-        await sleep(500 * 2 ** (attempt - 1));
+        await sleep(500 * 2 ** (attempt - 1) + Math.random() * 200);
       }
     }
 

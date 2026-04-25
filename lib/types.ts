@@ -21,6 +21,8 @@ export interface ProductAnalysis {
   productType: string;
   attributes: ProductAttributes;
   suggestions: Suggestion[];
+  /** Present when the server performed background removal. */
+  isolatedImageUrl?: string;
 }
 
 export interface ProductData {
