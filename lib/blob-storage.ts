@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api-response";
 const scheduledCleanup = new Map<string, number>();
 
 function logBlob(operation: string, details: Record<string, unknown>): void {
-  console.log(`[blob] ${operation}`, details);
+  console.info(`[blob] ${operation}`, details);
 }
 
 async function withRetry<T>(label: string, fn: () => Promise<T>, attempts = 3): Promise<T> {
