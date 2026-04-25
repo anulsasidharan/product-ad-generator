@@ -34,6 +34,17 @@ export type AspectRatio = "1:1" | "16:9" | "9:16" | "4:5";
 
 export type ImageModelKey = "flux-schnell" | "flux-pro" | "sdxl" | "dall-e-3";
 
+/** UI / API model selector: Auto defers to server suggestion. */
+export type GenerationModelChoice = ImageModelKey | "auto";
+
+export interface GenerationOptions {
+  aspectRatio: AspectRatio;
+  variants: number;
+  model: GenerationModelChoice;
+}
+
+export type ExportFormat = "png" | "jpg" | "webp";
+
 export interface GenerationRequest {
   productImageUrl: string;
   userPrompt: string;
