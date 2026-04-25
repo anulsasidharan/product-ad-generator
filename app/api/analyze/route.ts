@@ -47,7 +47,7 @@ export async function POST(request: Request): Promise<Response> {
       isolatedImageUrl = await generator.removeBackground(imageUrl);
     }
 
-    console.log(
+    console.info(
       JSON.stringify({
         event: "analyze_complete",
         timestamp: new Date().toISOString(),
