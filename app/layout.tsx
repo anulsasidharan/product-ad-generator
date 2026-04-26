@@ -28,12 +28,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-zinc-950 text-white">
         <Providers>
-          <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/80 backdrop-blur-sm">
+          <header className="sticky top-0 z-40 w-full border-b border-white/[0.06] bg-zinc-950/80 backdrop-blur-xl">
             <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-              <Link href="/" className="flex items-center gap-2.5 font-semibold text-slate-900 hover:opacity-90 transition-opacity">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600 shadow-sm">
+              <Link
+                href="/"
+                className="flex items-center gap-2.5 font-semibold text-white hover:opacity-90 transition-opacity"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600 shadow-glow-violet">
                   <Zap className="h-4 w-4 text-white" />
                 </span>
                 <span className="text-base tracking-tight">Olivia</span>
@@ -41,7 +44,7 @@ export default function RootLayout({
               <nav className="flex items-center gap-3">
                 <Link
                   href="/editor"
-                  className="rounded-md bg-primary-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-primary-700 transition-colors"
+                  className="rounded-lg bg-violet-600 px-4 py-1.5 text-sm font-medium text-white shadow-glow-violet transition hover:bg-violet-500"
                 >
                   Open Editor
                 </Link>

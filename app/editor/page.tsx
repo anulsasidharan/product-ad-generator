@@ -33,15 +33,15 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-700 mt-0.5">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-xs font-bold text-violet-400 mt-0.5 ring-1 ring-violet-500/20">
         {step}
       </span>
       <div>
         <div className="flex items-center gap-1.5">
-          <Icon className="h-4 w-4 text-slate-500" aria-hidden />
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+          <Icon className="h-4 w-4 text-zinc-500" aria-hidden />
+          <h2 className="text-base font-semibold text-white">{title}</h2>
         </div>
-        {description && <p className="mt-0.5 text-sm text-slate-500">{description}</p>}
+        {description && <p className="mt-0.5 text-sm text-zinc-500">{description}</p>}
       </div>
     </div>
   );
@@ -192,11 +192,18 @@ export default function EditorPage() {
   const effectiveProductUrl = isolatedUrl ?? remoteUrl;
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10">
+    <main className="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10">
+      {/* Subtle top glow */}
+      <div
+        className="pointer-events-none absolute left-1/2 top-0 h-64 w-[600px] -translate-x-1/2 rounded-full opacity-10"
+        style={{ background: "radial-gradient(ellipse, rgba(124,58,237,0.6) 0%, transparent 70%)" }}
+        aria-hidden
+      />
+
       {/* Page title */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Editor</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-2xl font-bold tracking-tight text-white">Editor</h1>
+        <p className="mt-1 text-sm text-zinc-500">
           Upload, generate, refine, and export — all in one workspace.
         </p>
       </div>
@@ -223,8 +230,8 @@ export default function EditorPage() {
                 isGenerating={generating}
               />
             ) : (
-              <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                <p className="text-sm text-slate-500">
+              <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.02] p-6 text-center">
+                <p className="text-sm text-zinc-500">
                   Analyse a product image first to unlock prompt controls.
                 </p>
               </div>
@@ -240,14 +247,19 @@ export default function EditorPage() {
 
           {/* Variant tabs */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Active variant</span>
+            <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Active variant</span>
             {generations.map((g, i) => (
               <Button
                 key={g.id}
                 type="button"
                 size="sm"
                 variant={i === selectedIndex ? "default" : "outline"}
-                className={cn("h-8 min-w-[2.5rem]", i === selectedIndex && "pointer-events-none")}
+                className={cn(
+                  "h-8 min-w-[2.5rem]",
+                  i === selectedIndex
+                    ? "bg-violet-600 text-white hover:bg-violet-500 border-transparent pointer-events-none"
+                    : "border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white",
+                )}
                 onClick={() => setSelectedIndex(i)}
               >
                 {i + 1}

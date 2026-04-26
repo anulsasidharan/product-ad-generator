@@ -5,13 +5,11 @@ import { Eye, EyeOff, FileImage, Redo2, Type, Undo2, ZoomIn, ZoomOut } from "luc
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CanvasState, ExportFormat, Generation, Layer, LayerType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface CanvasEditorProps {
   generation: Generation;
-  /** Isolated product image (transparent) for compositing on the generated scene. */
   productImageUrl?: string;
   onUpdate: (state: CanvasState) => void;
   onExport: (format: ExportFormat) => void;
@@ -80,7 +78,7 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
     const canvas = new Canvas(el, {
       width: W,
       height: H,
-      backgroundColor: "#f8fafc",
+      backgroundColor: "#09090b",
     });
     fabricRef.current = canvas;
 
@@ -95,31 +93,17 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
         const prod = await FabricImage.fromURL(productImageUrl, { crossOrigin: "anonymous" });
         const ps = Math.min(220 / (prod.width || 220), 220 / (prod.height || 220), 1);
         prod.scale(ps);
-        prod.set({
-          originX: "center",
-          originY: "center",
-          left: W / 2,
-          top: H / 2 + 40,
-          name: "product",
-        });
+        prod.set({ originX: "center", originY: "center", left: W / 2, top: H / 2 + 40, name: "product" });
         canvas.add(prod);
       }
       canvas.sendObjectToBack(bg);
-
-      canvas.on("object:modified", () => {
-        pushHistory();
-        syncLayers();
-      });
+      canvas.on("object:modified", () => { pushHistory(); syncLayers(); });
       pushHistory();
       syncLayers();
     };
 
     void load();
-
-    return () => {
-      canvas.dispose();
-      fabricRef.current = null;
-    };
+    return () => { canvas.dispose(); fabricRef.current = null; };
   }, [generation.imageUrl, productImageUrl, pushHistory, syncLayers]);
 
   const undo = useCallback(() => {
@@ -127,13 +111,7 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
     if (!c || historyIndexRef.current <= 0) return;
     historyIndexRef.current -= 1;
     const json = historyRef.current[historyIndexRef.current];
-    if (json) {
-      void c.loadFromJSON(json).then(() => {
-        c.requestRenderAll();
-        syncLayers();
-        setHistoryIndex(historyIndexRef.current);
-      });
-    }
+    if (json) void c.loadFromJSON(json).then(() => { c.requestRenderAll(); syncLayers(); setHistoryIndex(historyIndexRef.current); });
   }, [syncLayers]);
 
   const redo = useCallback(() => {
@@ -141,13 +119,7 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
     if (!c || historyIndexRef.current >= historyRef.current.length - 1) return;
     historyIndexRef.current += 1;
     const json = historyRef.current[historyIndexRef.current];
-    if (json) {
-      void c.loadFromJSON(json).then(() => {
-        c.requestRenderAll();
-        syncLayers();
-        setHistoryIndex(historyIndexRef.current);
-      });
-    }
+    if (json) void c.loadFromJSON(json).then(() => { c.requestRenderAll(); syncLayers(); setHistoryIndex(historyIndexRef.current); });
   }, [syncLayers]);
 
   const addText = useCallback(() => {
@@ -158,7 +130,7 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
       top: 80,
       width: 240,
       fontSize: 28,
-      fill: "#0f172a",
+      fill: "#ffffff",
       editable: true,
     });
     c.add(text);
@@ -207,10 +179,13 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < historyLength - 1;
 
+  const toolBtnClass = "h-7 w-7 p-0 border-white/[0.08] bg-white/[0.04] text-zinc-400 hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:opacity-30";
+
   return (
-    <Card className="w-full border-slate-200 shadow-sm">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3">
-        <CardTitle className="text-base font-semibold">Canvas</CardTitle>
+    <div className="w-full rounded-2xl glass shadow-glass">
+      {/* Header */}
+      <div className="flex flex-col gap-3 px-4 pt-4 pb-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-base font-semibold text-white">Canvas</h2>
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-1.5">
@@ -219,66 +194,36 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
             size="sm"
             variant="outline"
             onClick={addText}
-            className="gap-1.5 text-xs"
+            className="gap-1.5 text-xs border-white/[0.08] bg-white/[0.04] text-zinc-300 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
             aria-label="Add text layer"
           >
             <Type className="h-3.5 w-3.5" aria-hidden />
             Text
           </Button>
 
-          <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={undo}
-              disabled={!canUndo}
-              aria-label="Undo"
-              className="h-7 w-7 p-0"
-            >
+          <div className="flex items-center gap-0.5 rounded-md border border-white/[0.08] bg-white/[0.02] p-0.5">
+            <Button type="button" size="sm" variant="ghost" onClick={undo} disabled={!canUndo} aria-label="Undo" className={toolBtnClass}>
               <Undo2 className="h-3.5 w-3.5" aria-hidden />
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={redo}
-              disabled={!canRedo}
-              aria-label="Redo"
-              className="h-7 w-7 p-0"
-            >
+            <Button type="button" size="sm" variant="ghost" onClick={redo} disabled={!canRedo} aria-label="Redo" className={toolBtnClass}>
               <Redo2 className="h-3.5 w-3.5" aria-hidden />
             </Button>
           </div>
 
-          <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => zoom(1.1)}
-              aria-label="Zoom in"
-              className="h-7 w-7 p-0"
-            >
+          <div className="flex items-center gap-0.5 rounded-md border border-white/[0.08] bg-white/[0.02] p-0.5">
+            <Button type="button" size="sm" variant="ghost" onClick={() => zoom(1.1)} aria-label="Zoom in" className={toolBtnClass}>
               <ZoomIn className="h-3.5 w-3.5" aria-hidden />
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => zoom(1 / 1.1)}
-              aria-label="Zoom out"
-              className="h-7 w-7 p-0"
-            >
+            <Button type="button" size="sm" variant="ghost" onClick={() => zoom(1 / 1.1)} aria-label="Zoom out" className={toolBtnClass}>
               <ZoomOut className="h-3.5 w-3.5" aria-hidden />
             </Button>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="flex flex-col gap-4 lg:flex-row">
+      <div className="flex flex-col gap-4 px-4 pb-4 lg:flex-row">
         {/* Canvas viewport */}
-        <div className="overflow-auto rounded-xl border border-slate-200 bg-white p-2">
+        <div className="overflow-auto rounded-xl border border-white/[0.06] bg-zinc-950 p-1">
           <canvas ref={canvasElRef} className="touch-none" />
         </div>
 
@@ -286,9 +231,9 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
         <div className="w-full shrink-0 space-y-4 lg:w-52">
           {/* Layers */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Layers</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">Layers</p>
             {layers.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">No layers yet</p>
+              <p className="text-xs text-zinc-600 italic">No layers yet</p>
             ) : (
               <ul className="space-y-1">
                 {layers.map((layer, i) => (
@@ -296,17 +241,17 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
                     <button
                       type="button"
                       className={cn(
-                        "flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-left text-xs transition hover:bg-slate-50",
-                        !layer.visible && "opacity-50",
+                        "flex w-full items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-left text-xs transition hover:border-white/[0.12] hover:bg-white/[0.06]",
+                        !layer.visible && "opacity-40",
                       )}
                       onClick={() => toggleLayer(i)}
                       aria-label={`Toggle layer ${layer.label} visibility`}
                     >
-                      <span className="truncate font-medium text-slate-700">{layer.label}</span>
+                      <span className="truncate font-medium text-zinc-300">{layer.label}</span>
                       {layer.visible ? (
-                        <Eye className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                        <Eye className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
                       ) : (
-                        <EyeOff className="h-3.5 w-3.5 shrink-0 text-slate-300" aria-hidden />
+                        <EyeOff className="h-3.5 w-3.5 shrink-0 text-zinc-700" aria-hidden />
                       )}
                     </button>
                   </li>
@@ -316,8 +261,8 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
           </div>
 
           {/* Export */}
-          <div className="border-t pt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Export</p>
+          <div className="border-t border-white/[0.06] pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">Export</p>
             <div className="flex flex-col gap-1.5">
               {(["png", "jpg", "webp"] as ExportFormat[]).map((fmt) => (
                 <Button
@@ -326,16 +271,16 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
                   size="sm"
                   variant="outline"
                   onClick={() => exportCanvas(fmt)}
-                  className="justify-start gap-2 text-xs"
+                  className="justify-start gap-2 text-xs border-white/[0.08] bg-white/[0.04] text-zinc-300 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
                 >
-                  <FileImage className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+                  <FileImage className="h-3.5 w-3.5 text-zinc-600" aria-hidden />
                   {fmt.toUpperCase()}
                 </Button>
               ))}
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import type { Generation } from "@/lib/types";
 
 interface ResultsGalleryProps {
@@ -41,9 +40,7 @@ async function downloadImage(imageUrl: string, format: "png" | "jpeg" | "webp", 
   URL.revokeObjectURL(img.src);
   const mime = format === "png" ? "image/png" : format === "jpeg" ? "image/jpeg" : "image/webp";
   const quality = format === "png" ? undefined : 0.88;
-  const out = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob((b) => resolve(b), mime, quality),
-  );
+  const out = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), mime, quality));
   if (!out) throw new Error("Encode failed");
   const url = URL.createObjectURL(out);
   const a = document.createElement("a");
@@ -76,12 +73,8 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
   }, [close, generations.length, lightbox]);
 
   const shareUrl = useCallback(async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied");
-    } catch {
-      toast.error("Could not copy link");
-    }
+    try { await navigator.clipboard.writeText(url); toast.success("Link copied"); }
+    catch { toast.error("Could not copy link"); }
   }, []);
 
   if (generations.length === 0) return null;
@@ -91,45 +84,42 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {generations.map((g, index) => (
           <motion.div key={g.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="group overflow-hidden border-slate-200 shadow-sm transition hover:shadow-md">
+            <div className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] shadow-glass transition duration-200 hover:border-white/[0.14] hover:shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
               <button
                 type="button"
-                className="relative block aspect-square w-full bg-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                onClick={() => {
-                  setSlider(50);
-                  setLightbox(index);
-                }}
+                className="relative block aspect-square w-full bg-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                onClick={() => { setSlider(50); setLightbox(index); }}
                 aria-label={`Open preview for variant ${index + 1}`}
               >
                 <Image
                   src={g.imageUrl}
                   alt=""
                   fill
-                  className="object-cover transition group-hover:scale-[1.02]"
+                  className="object-cover transition duration-300 group-hover:scale-[1.03]"
                   sizes="(max-width:768px) 100vw, 33vw"
                   loading="lazy"
                   unoptimized
                 />
                 {/* Variant badge */}
-                <span className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
                   Variant {index + 1}
                 </span>
-                {/* Hover prompt overlay */}
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-left text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {/* Hover overlay */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-left text-xs text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                   <span className="line-clamp-2 leading-relaxed">{g.optimizedPrompt}</span>
                 </div>
               </button>
 
-              <CardContent className="space-y-2.5 p-3">
+              <div className="space-y-2.5 p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-semibold text-primary-800">
+                  <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-300 ring-1 ring-violet-500/20">
                     {modelLabel(g.model)}
                   </span>
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] text-zinc-600">
                     {(g.metadata.generationTime / 1000).toFixed(1)}s
                   </span>
                 </div>
-                <p className="line-clamp-2 text-xs leading-relaxed text-slate-500" title={g.optimizedPrompt}>
+                <p className="line-clamp-2 text-xs leading-relaxed text-zinc-500" title={g.optimizedPrompt}>
                   {g.optimizedPrompt}
                 </p>
                 <div className="flex gap-1.5">
@@ -137,7 +127,7 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 gap-1.5 px-2 text-[11px] font-medium"
+                    className="h-7 gap-1.5 px-2 text-[11px] font-medium border-white/[0.08] bg-white/[0.04] text-zinc-400 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
                     onClick={() => onRegenerate(g.id)}
                   >
                     <RefreshCw className="h-3 w-3" aria-hidden />
@@ -147,15 +137,15 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-7 w-7 p-0 text-slate-500"
+                    className="h-7 w-7 p-0 text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06]"
                     onClick={() => void shareUrl(g.imageUrl)}
                     aria-label="Copy image URL"
                   >
                     <Share2 className="h-3.5 w-3.5" aria-hidden />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </motion.div>
         ))}
       </div>
@@ -164,7 +154,7 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
       <AnimatePresence>
         {lightbox !== null && active && (
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -173,14 +163,14 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
             aria-label="Image preview"
           >
             <motion.div
-              className="relative max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+              className="relative max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/[0.08] bg-zinc-950 shadow-glass"
               initial={{ scale: 0.96, y: 8 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.96, y: 8 }}
             >
               <button
                 type="button"
-                className="absolute right-3 top-3 z-10 rounded-full bg-black/40 p-2 text-white backdrop-blur-sm hover:bg-black/60 transition-colors"
+                className="absolute right-3 top-3 z-10 rounded-full bg-white/[0.08] p-2 text-white backdrop-blur-sm hover:bg-white/[0.15] transition-colors"
                 onClick={close}
                 aria-label="Close"
               >
@@ -189,30 +179,15 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
 
               <div className="grid max-h-[85vh] gap-4 overflow-auto p-4 md:grid-cols-[1fr_260px]">
                 {/* Image with before/after slider */}
-                <div className="relative min-h-[280px] w-full overflow-hidden rounded-xl bg-slate-100">
+                <div className="relative min-h-[280px] w-full overflow-hidden rounded-xl bg-zinc-900">
                   <div className="relative aspect-square w-full touch-pan-y">
-                    <Image
-                      src={active.imageUrl}
-                      alt="Generated ad"
-                      fill
-                      className="object-contain"
-                      sizes="(max-width:768px) 100vw, 800px"
-                      priority
-                      unoptimized
-                    />
+                    <Image src={active.imageUrl} alt="Generated ad" fill className="object-contain" sizes="(max-width:768px) 100vw, 800px" priority unoptimized />
                     <div
-                      className="absolute inset-0 overflow-hidden border-r-2 border-white/90 shadow-md"
+                      className="absolute inset-0 overflow-hidden border-r-2 border-white/40 shadow-md"
                       style={{ clipPath: `inset(0 ${100 - slider}% 0 0)` }}
                       aria-hidden
                     >
-                      <Image
-                        src={originalProductUrl}
-                        alt="Original product"
-                        fill
-                        className="object-contain"
-                        sizes="800px"
-                        unoptimized
-                      />
+                      <Image src={originalProductUrl} alt="Original product" fill className="object-contain" sizes="800px" unoptimized />
                     </div>
                   </div>
                   <input
@@ -221,10 +196,10 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
                     max={100}
                     value={slider}
                     onChange={(e) => setSlider(Number(e.target.value))}
-                    className="absolute bottom-3 left-1/2 w-[min(90%,360px)] -translate-x-1/2 accent-primary-600"
+                    className="absolute bottom-3 left-1/2 w-[min(90%,360px)] -translate-x-1/2 accent-violet-500"
                     aria-label="Before and after comparison"
                   />
-                  <span className="pointer-events-none absolute left-3 top-3 rounded-lg bg-black/50 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
+                  <span className="pointer-events-none absolute left-3 top-3 rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
                     Original (left) · Generated (full)
                   </span>
                 </div>
@@ -232,7 +207,7 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
                 {/* Actions sidebar */}
                 <div className="flex flex-col gap-3 text-sm">
                   <div>
-                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Download</p>
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-600">Download</p>
                     <div className="flex flex-col gap-1.5">
                       {(["png", "jpeg", "webp"] as const).map((fmt) => (
                         <Button
@@ -240,16 +215,13 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="justify-start gap-2 text-xs"
+                          className="justify-start gap-2 text-xs border-white/[0.08] bg-white/[0.04] text-zinc-300 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
                           onClick={() =>
-                            void downloadImage(
-                              active.imageUrl,
-                              fmt,
-                              `${active.id}.${fmt === "jpeg" ? "jpg" : fmt}`,
-                            ).catch(() => toast.error(`${fmt.toUpperCase()} download failed`))
+                            void downloadImage(active.imageUrl, fmt, `${active.id}.${fmt === "jpeg" ? "jpg" : fmt}`)
+                              .catch(() => toast.error(`${fmt.toUpperCase()} download failed`))
                           }
                         >
-                          <FileImage className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+                          <FileImage className="h-3.5 w-3.5 text-zinc-500" aria-hidden />
                           {fmt === "png" ? "PNG (full quality)" : fmt === "jpeg" ? "JPG (web)" : "WebP (small)"}
                         </Button>
                       ))}
@@ -260,7 +232,7 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
                     type="button"
                     variant="secondary"
                     size="sm"
-                    className="gap-2 text-xs"
+                    className="gap-2 text-xs border-white/[0.08] bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08] hover:text-white"
                     onClick={() => void shareUrl(active.imageUrl)}
                   >
                     <Copy className="h-3.5 w-3.5" aria-hidden />
@@ -268,31 +240,29 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
                   </Button>
 
                   {/* Variant navigation */}
-                  <div className="mt-auto flex items-center justify-between gap-2 border-t pt-3">
+                  <div className="mt-auto flex items-center justify-between gap-2 border-t border-white/[0.06] pt-3">
                     <Button
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 border-white/[0.08] bg-white/[0.04] text-zinc-400 hover:border-white/20 hover:text-white"
                       aria-label="Previous variant"
                       disabled={lightbox === 0}
                       onClick={() => setLightbox((i) => (i === null || i === 0 ? i : i - 1))}
                     >
                       <ChevronLeft className="h-4 w-4" aria-hidden />
                     </Button>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-zinc-500">
                       {lightbox + 1} / {generations.length}
                     </span>
                     <Button
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 border-white/[0.08] bg-white/[0.04] text-zinc-400 hover:border-white/20 hover:text-white"
                       aria-label="Next variant"
                       disabled={lightbox === generations.length - 1}
-                      onClick={() =>
-                        setLightbox((i) => (i === null || i >= generations.length - 1 ? i : i + 1))
-                      }
+                      onClick={() => setLightbox((i) => (i === null || i >= generations.length - 1 ? i : i + 1))}
                     >
                       <ChevronRight className="h-4 w-4" aria-hidden />
                     </Button>
