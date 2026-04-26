@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Bot, Layers, MessageSquare, ScanSearch, Sparkles, Upload, Wand2 } from "lucide-react";
+import { ExamplesGallery } from "@/components/home/ExamplesGallery";
 
 export default function Home() {
   const features = [
@@ -61,30 +62,6 @@ export default function Home() {
       step: "04",
       title: "Refine & Export",
       description: "Chat to iterate, edit on canvas, and download polished creatives.",
-    },
-  ];
-
-  const examples = [
-    {
-      label: "Minimal Studio",
-      copy: "Clean backdrop, soft shadows, and product-first composition.",
-      gradient: "from-zinc-800 to-zinc-900",
-      accent: "border-zinc-700",
-      badge: "Variant 1",
-    },
-    {
-      label: "Lifestyle Scene",
-      copy: "Context-rich setup that places your product in a relatable moment.",
-      gradient: "from-violet-950 to-indigo-950",
-      accent: "border-violet-800/50",
-      badge: "Variant 2",
-    },
-    {
-      label: "Bold Social Variant",
-      copy: "High-contrast, attention-grabbing layout optimised for feed performance.",
-      gradient: "from-indigo-950 to-violet-950",
-      accent: "border-indigo-800/50",
-      badge: "Variant 3",
     },
   ];
 
@@ -186,35 +163,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Examples Gallery ── */}
-      <section id="examples" className="relative mx-auto w-full max-w-6xl px-6 pb-16">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Examples Gallery</h2>
-          <p className="mt-2 text-sm text-zinc-500">Styles you can generate with a simple prompt</p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {examples.map((example) => (
-            <article
-              key={example.label}
-              className={`group overflow-hidden rounded-2xl border ${example.accent} shadow-glass transition duration-200 hover:border-white/20`}
-            >
-              <div className={`relative h-48 bg-gradient-to-br ${example.gradient}`}>
-                <span className="absolute left-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-xs font-semibold text-white/80 backdrop-blur-sm">
-                  {example.badge}
-                </span>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Sparkles className="h-12 w-12 text-white/10" aria-hidden />
-                </div>
-              </div>
-              <div className="glass-elevated p-4">
-                <h3 className="text-sm font-semibold text-white">{example.label}</h3>
-                <p className="mt-1 text-sm text-zinc-400">{example.copy}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <ExamplesGallery />
 
       {/* ── CTA ── */}
       <section className="relative mx-auto w-full max-w-6xl px-6 pb-24">

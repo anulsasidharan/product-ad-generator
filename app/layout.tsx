@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Zap } from "lucide-react";
 
 import { Providers } from "@/components/providers";
+import { ProductTourLauncher } from "@/components/tour/ProductTourLauncher";
 
 import "./globals.css";
 
@@ -42,6 +43,7 @@ export default function RootLayout({
                 <span className="text-base tracking-tight">Olivia</span>
               </Link>
               <nav className="flex items-center gap-3">
+                <ProductTourLauncher />
                 <Link
                   href="/editor"
                   className="rounded-lg bg-violet-600 px-4 py-1.5 text-sm font-medium text-white shadow-glow-violet transition hover:bg-violet-500"
