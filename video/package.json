@@ -1,0 +1,26 @@
+{
+  "name": "product-ad-generator-video",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "remotion studio",
+    "render": "remotion render ProductTour out/product-tour.mp4 --codec=h264",
+    "render:30s": "remotion render ProductTour out/product-tour-30s.mp4 --codec=h264 --frames=0-899",
+    "render:60s": "remotion render ProductTour out/product-tour-60s.mp4 --codec=h264 --frames=0-1799",
+    "render:gif": "remotion render ProductTour out/product-tour-intro.gif --codec=gif --frames=0-449"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "remotion": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5"
+  },
+  "remotion": {
+    "entryPoint": "./src/index.ts"
+  }
+}
