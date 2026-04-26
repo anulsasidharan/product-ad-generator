@@ -3,13 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --background: 255 255 255;
-  --foreground: 15 23 42;
-  --primary: 59 130 246;
+  --background: 9 9 11;
+  --surface: 24 24 27;
+  --foreground: 248 250 252;
+  --foreground-muted: 113 113 122;
+  --primary: 124 58 237;
   --primary-foreground: 255 255 255;
-  --muted: 241 245 249;
-  --muted-foreground: 71 85 105;
-  --border: 226 232 240;
+  --border: 39 39 42;
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glow-primary: rgba(124, 58, 237, 0.3);
 }
 
 * {
@@ -19,4 +22,45 @@
 body {
   background-color: rgb(var(--background));
   color: rgb(var(--foreground));
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-elevated {
+    background: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .glow-violet {
+    box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.3),
+      0 8px 32px rgba(124, 58, 237, 0.2), 0 0 80px rgba(124, 58, 237, 0.08);
+  }
+
+  .glow-violet-sm {
+    box-shadow: 0 0 16px rgba(124, 58, 237, 0.18);
+  }
+
+  .text-gradient-violet {
+    background: linear-gradient(135deg, #a78bfa, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-grid {
+    background-image: linear-gradient(
+        rgba(255, 255, 255, 0.025) 1px,
+        transparent 1px
+      ),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
 }
