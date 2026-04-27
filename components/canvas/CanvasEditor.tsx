@@ -19,7 +19,8 @@ interface CanvasEditorProps {
 const W = 800;
 const H = 600;
 
-export function CanvasEditor({ generation, productImageUrl: _productImageUrl, onUpdate, onExport }: CanvasEditorProps) {
+export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }: CanvasEditorProps) {
+  void productImageUrl;
   const canvasElRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<Canvas | null>(null);
   const historyRef = useRef<string[]>([]);

@@ -73,7 +73,7 @@ export function PromptInput({
     if (recommendedOptions.model) {
       setModel(recommendedOptions.model);
     }
-  }, [recommendedOptions?.aspectRatio, recommendedOptions?.model]);
+  }, [recommendedOptions]);
 
   const debouncedPrompt = useDebounced(prompt, 280);
 

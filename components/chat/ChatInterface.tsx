@@ -274,7 +274,22 @@ export function ChatInterface({
       setPending(false);
       queueMicrotask(() => { onHistoryChange?.(toConversationTurns(messagesRef.current)); });
     }
-  }, [generation.id, generation.imageUrl, input, isProcessing, onHistoryChange, onImageUpdate, onIteration, pending, productImageUrl, toConversationTurns]);
+  }, [
+    generation.id,
+    generation.imageUrl,
+    generation.model,
+    generation.optimizedPrompt,
+    generation.parameters,
+    input,
+    isProcessing,
+    onHistoryChange,
+    onImageUpdate,
+    onIteration,
+    orchestration,
+    pending,
+    productImageUrl,
+    toConversationTurns,
+  ]);
 
   const busy = pending || isProcessing;
 

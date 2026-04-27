@@ -185,7 +185,7 @@ export default function EditorPage() {
         setGenerating(false);
       }
     },
-    [analysis, isolatedUrl, remoteUrl],
+    [analysis, generations, isolatedUrl, remoteUrl],
   );
 
   const handleGenerate = useCallback(
