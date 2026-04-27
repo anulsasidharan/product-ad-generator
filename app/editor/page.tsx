@@ -92,6 +92,8 @@ export default function EditorPage() {
     setAnalysis(a);
     if (a.isolatedImageUrl) {
       setIsolatedUrl(a.isolatedImageUrl);
+    } else {
+      setIsolatedUrl(null);
     }
   }, []);
 
@@ -111,7 +113,7 @@ export default function EditorPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            productImageUrl: remoteUrl,
+            productImageUrl: isolatedUrl ?? remoteUrl,
             userPrompt: prompt,
             productContext: {
               productType: analysis.productType,
@@ -126,10 +128,14 @@ export default function EditorPage() {
         const raw: unknown = await res.json();
         const parsed = GenerateResponseSchema.safeParse(raw);
         if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.data?.generations?.length) {
-          const errorMsg =
-            parsed.success && parsed.data.error
-              ? parsed.data.error
-              : "Generation failed";
+          const body = parsed.success ? parsed.data : null;
+          const code = body?.code;
+          let errorMsg =
+            body?.error ?? "Generation failed";
+          if (code === "PROVIDER_QUOTA_EXCEEDED") {
+            errorMsg =
+              `${errorMsg} Add credits at replicate.com/account#billing or set a valid REPLICATE_API_TOKEN.`;
+          }
           throw new Error(errorMsg);
         }
 
@@ -148,7 +154,7 @@ export default function EditorPage() {
         setGenerating(false);
       }
     },
-    [analysis, remoteUrl],
+    [analysis, isolatedUrl, remoteUrl],
   );
 
   const handleGenerate = useCallback(
@@ -182,11 +188,17 @@ export default function EditorPage() {
     [],
   );
 
-  const syncCanvasState = useCallback(
-    (genId: string, state: CanvasState) => {
-      setCanvasStateByGenId((m) => ({ ...m, [genId]: state }));
+  const syncCanvasState = useCallback((genId: string, state: CanvasState) => {
+    setCanvasStateByGenId((m) => ({ ...m, [genId]: state }));
+  }, []);
+
+  const activeGenId = selectedGeneration?.id;
+  const onCanvasStateUpdate = useCallback(
+    (state: CanvasState) => {
+      if (!activeGenId) return;
+      syncCanvasState(activeGenId, state);
     },
-    [],
+    [activeGenId, syncCanvasState],
   );
 
   const effectiveProductUrl = isolatedUrl ?? remoteUrl;
@@ -283,7 +295,7 @@ export default function EditorPage() {
             <CanvasEditor
               generation={selectedGeneration}
               productImageUrl={effectiveProductUrl}
-              onUpdate={(state) => syncCanvasState(selectedGeneration.id, state)}
+              onUpdate={onCanvasStateUpdate}
               onExport={(format) => toast.success(`Exported as ${format.toUpperCase()}`)}
             />
             <ChatInterface

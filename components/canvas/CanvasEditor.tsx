@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 interface CanvasEditorProps {
   generation: Generation;
+  /** Unused for display: server generations are already composited; a second product layer caused a “picture on picture” bug. */
   productImageUrl?: string;
   onUpdate: (state: CanvasState) => void;
   onExport: (format: ExportFormat) => void;
@@ -18,11 +19,14 @@ interface CanvasEditorProps {
 const W = 800;
 const H = 600;
 
-export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }: CanvasEditorProps) {
+export function CanvasEditor({ generation, productImageUrl: _productImageUrl, onUpdate, onExport }: CanvasEditorProps) {
   const canvasElRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<Canvas | null>(null);
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [layers, setLayers] = useState<{ id: string; label: string; visible: boolean }[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [historyLength, setHistoryLength] = useState(0);
@@ -38,7 +42,7 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
     setHistoryLength(historyRef.current.length);
   }, []);
 
-  const syncLayers = useCallback(() => {
+  const flushSyncLayers = useCallback(() => {
     const c = fabricRef.current;
     if (!c) return;
     const fabricObjects = c.getObjects();
@@ -63,13 +67,23 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
           : { kind: "image" as const, url: "" },
       };
     });
-    onUpdate({
+    onUpdateRef.current({
       layers: typedLayers,
       dimensions: { width: c.getWidth(), height: c.getHeight() },
       history: [{ layers: typedLayers, dimensions: { width: c.getWidth(), height: c.getHeight() } }],
       historyIndex: historyIndexRef.current,
     });
-  }, [onUpdate]);
+  }, []);
+
+  const scheduleSyncLayers = useCallback(() => {
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current);
+    }
+    syncTimerRef.current = setTimeout(() => {
+      syncTimerRef.current = null;
+      flushSyncLayers();
+    }, 120);
+  }, [flushSyncLayers]);
 
   useEffect(() => {
     const el = canvasElRef.current;
@@ -83,44 +97,49 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
     fabricRef.current = canvas;
 
     const load = async () => {
+      // `generation.imageUrl` is already the server-side composite (product on FLUX background).
+      // Do not add `productImageUrl` again — that duplicated the product and looked like a hard overlay.
       const bg = await FabricImage.fromURL(generation.imageUrl, { crossOrigin: "anonymous" });
       const scale = Math.min((W * 0.92) / (bg.width || W), (H * 0.92) / (bg.height || H), 1);
       bg.scale(scale);
       bg.set({ originX: "center", originY: "center", left: W / 2, top: H / 2, selectable: false, evented: false });
       canvas.add(bg);
 
-      if (productImageUrl) {
-        const prod = await FabricImage.fromURL(productImageUrl, { crossOrigin: "anonymous" });
-        const ps = Math.min(220 / (prod.width || 220), 220 / (prod.height || 220), 1);
-        prod.scale(ps);
-        prod.set({ originX: "center", originY: "center", left: W / 2, top: H / 2 + 40, name: "product" });
-        canvas.add(prod);
-      }
       canvas.sendObjectToBack(bg);
-      canvas.on("object:modified", () => { pushHistory(); syncLayers(); });
+      canvas.on("object:modified", () => {
+        pushHistory();
+        scheduleSyncLayers();
+      });
       pushHistory();
-      syncLayers();
+      flushSyncLayers();
     };
 
     void load();
-    return () => { canvas.dispose(); fabricRef.current = null; };
-  }, [generation.imageUrl, productImageUrl, pushHistory, syncLayers]);
+    return () => {
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+      canvas.dispose();
+      fabricRef.current = null;
+    };
+  }, [generation.id, generation.imageUrl, pushHistory, flushSyncLayers, scheduleSyncLayers]);
 
   const undo = useCallback(() => {
     const c = fabricRef.current;
     if (!c || historyIndexRef.current <= 0) return;
     historyIndexRef.current -= 1;
     const json = historyRef.current[historyIndexRef.current];
-    if (json) void c.loadFromJSON(json).then(() => { c.requestRenderAll(); syncLayers(); setHistoryIndex(historyIndexRef.current); });
-  }, [syncLayers]);
+    if (json) void c.loadFromJSON(json).then(() => { c.requestRenderAll(); flushSyncLayers(); setHistoryIndex(historyIndexRef.current); });
+  }, [flushSyncLayers]);
 
   const redo = useCallback(() => {
     const c = fabricRef.current;
     if (!c || historyIndexRef.current >= historyRef.current.length - 1) return;
     historyIndexRef.current += 1;
     const json = historyRef.current[historyIndexRef.current];
-    if (json) void c.loadFromJSON(json).then(() => { c.requestRenderAll(); syncLayers(); setHistoryIndex(historyIndexRef.current); });
-  }, [syncLayers]);
+    if (json) void c.loadFromJSON(json).then(() => { c.requestRenderAll(); flushSyncLayers(); setHistoryIndex(historyIndexRef.current); });
+  }, [flushSyncLayers]);
 
   const addText = useCallback(() => {
     const c = fabricRef.current;
@@ -136,8 +155,8 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
     c.add(text);
     c.setActiveObject(text);
     pushHistory();
-    syncLayers();
-  }, [pushHistory, syncLayers]);
+    flushSyncLayers();
+  }, [pushHistory, flushSyncLayers]);
 
   const zoom = useCallback((factor: number) => {
     const c = fabricRef.current;
@@ -171,9 +190,9 @@ export function CanvasEditor({ generation, productImageUrl, onUpdate, onExport }
       if (!obj) return;
       obj.visible = !obj.visible;
       c.requestRenderAll();
-      syncLayers();
+      flushSyncLayers();
     },
-    [syncLayers],
+    [flushSyncLayers],
   );
 
   const canUndo = historyIndex > 0;

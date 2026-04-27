@@ -22,6 +22,30 @@ async function fetchBuffer(url: string): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
+/**
+ * Opaque product photos (JPEG / studio PNG) must be cut out before compositing; otherwise Sharp
+ * pastes a solid rectangle (white backdrop) on top of the generated scene.
+ *
+ * Checking `hasAlpha` alone is insufficient — a PNG can carry an alpha channel while every pixel
+ * is fully opaque (alpha = 255). We inspect the channel statistics: only skip background removal
+ * when there are actual transparent pixels (alpha min < 255).
+ */
+export async function resolveProductUrlForComposite(
+  productUrl: string,
+  removeBackground: (url: string) => Promise<string>,
+): Promise<string> {
+  const buf = await fetchBuffer(productUrl);
+  const meta = await sharp(buf).metadata();
+  if (meta.hasAlpha) {
+    const stats = await sharp(buf).stats();
+    const alphaStats = stats.channels[3]; // RGBA: channel 3 is alpha
+    if (alphaStats && alphaStats.min < 255) {
+      return productUrl; // genuine transparency present — no removal needed
+    }
+  }
+  return removeBackground(productUrl);
+}
+
 export interface CompositeOptions {
   /** 0–1 relative position; default centers product. */
   position?: { x: number; y: number };
@@ -50,7 +74,18 @@ export async function compositeProductOnBackground(
   const maxW = Math.floor(bgWidth * maxCover);
   const maxH = Math.floor(bgHeight * maxCover);
 
-  const resizedProduct = await sharp(productBuf)
+  const productMeta = await sharp(productBuf).metadata();
+  let productPipeline = sharp(productBuf).ensureAlpha();
+  if (productMeta.hasAlpha) {
+    try {
+      const trimmed = await sharp(productBuf).ensureAlpha().trim().png().toBuffer();
+      productPipeline = sharp(trimmed).ensureAlpha();
+    } catch {
+      productPipeline = sharp(productBuf).ensureAlpha();
+    }
+  }
+
+  const resizedProduct = await productPipeline
     .resize({
       width: maxW,
       height: maxH,
@@ -73,7 +108,7 @@ export async function compositeProductOnBackground(
   const top = Math.max(0, Math.round(posY * (bgHeight - ph)));
 
   return sharp(bgBuf)
-    .composite([{ input: resizedProduct, left, top }])
+    .composite([{ input: resizedProduct, left, top, blend: "over" }])
     .png()
     .toBuffer();
 }

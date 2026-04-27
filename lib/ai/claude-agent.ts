@@ -23,16 +23,21 @@ Format as JSON following this exact shape (no markdown fences, no extra keys):
 }`;
 
 const OPTIMIZE_SYSTEM = `You are an expert at writing prompts for image generation models like FLUX and Stable Diffusion.
-Transform the user's casual description into a detailed, technical prompt that:
-1. Incorporates their intent
-2. Adds appropriate photography terms (lighting, composition, camera angle)
-3. Ensures the product is accurately represented
-4. Creates a professional marketing aesthetic
-5. Includes negative prompts to avoid (e.g., 'blurry, low quality')
 
-Return ONLY the optimized prompt as plain text, no explanations.`;
+Transform the user's casual description into a detailed, technical prompt for a BACKGROUND SCENE only.
+CRITICAL: Do NOT include the product in the prompt. The product image will be composited on top of the generated background in a separate step — describing the product in the prompt causes it to appear twice.
 
-const VARIANTS_SYSTEM = `You create diverse variant prompts for product marketing image generation.
+The prompt must:
+1. Describe only the environment, surfaces, props, and lighting that complement the product type
+2. Add appropriate photography terms (lighting style, camera angle, depth of field)
+3. Set a mood that suits the product category
+4. Create a professional marketing aesthetic
+5. Explicitly leave the foreground empty for product placement
+
+Return ONLY the background scene prompt as plain text, no explanations.`;
+
+const VARIANTS_SYSTEM = `You create diverse variant background scene prompts for product marketing image generation.
+CRITICAL: Each prompt must describe ONLY the environment, setting, surfaces, props, and lighting — NOT the product itself. The product will be composited on top of the generated background in a separate step.
 Return ONLY valid JSON: an array of objects, each with:
 { "prompt": string, "reasoning": string, "parameters": { "style": string, "lighting": string, "composition": string } }
 No markdown fences.`;
@@ -55,7 +60,7 @@ Rules:
 - regenerate: parameters { "modifiedPrompt": string, "reason": string }
 - clarify: parameters { "question": string, "options": string[] }`;
 
-export const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+export const DEFAULT_MODEL = "claude-sonnet-4-6";
 const CACHE_MAX = 50;
 
 function sleep(ms: number): Promise<void> {
@@ -423,13 +428,13 @@ User's request: ${userPrompt}`;
     productContext: ProductContext,
     count: number,
   ): Promise<VariantPlan[]> {
-    const userContent = `Base optimized prompt:
+    const userContent = `Base optimized background prompt:
 ${optimizedPrompt}
 
 Product type: ${productContext.productType}
 Category: ${productContext.attributes.category}
 
-Produce exactly ${count} variants with different composition/lighting/mood while keeping the product accurate.`;
+Produce exactly ${count} background scene variants with different composition/lighting/mood. Do NOT include the product in any prompt — only describe the environment and setting. The product will be composited on top separately.`;
 
     const response = await this.client.messages.create({
       model: this.model,

@@ -44,15 +44,29 @@ export async function uploadImage(
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `${folder}/${userId}/${Date.now()}-${safeName}`;
 
-  const blob = await withRetry("uploadImage", () =>
-    put(path, buffer, {
-      access: "public",
-      token,
-    }),
-  );
+  const blob = await withRetry("uploadImage", async () => {
+    try {
+      return await put(path, buffer, {
+        access: "public",
+        token,
+      });
+    } catch (error) {
+      const message = String(error);
+      if (!message.includes("Cannot use public access on a private store")) {
+        throw error;
+      }
 
-  logBlob("uploadImage", { path, url: blob.url });
-  return blob.url;
+      // Private blob stores reject explicit `access: "public"`.
+      // Retry with default store access so local/dev uploads still work.
+      return put(path, buffer, { token });
+    }
+  });
+
+  const clientUrl =
+    "downloadUrl" in blob && typeof blob.downloadUrl === "string" ? blob.downloadUrl : blob.url;
+
+  logBlob("uploadImage", { path, url: blob.url, clientUrl });
+  return clientUrl;
 }
 
 /**

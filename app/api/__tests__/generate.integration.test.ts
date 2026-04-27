@@ -4,9 +4,13 @@ const optimizePromptMock = vi.fn();
 const generateVariantsMock = vi.fn();
 const generateImageMock = vi.fn();
 const uploadImageMock = vi.fn();
-const compositeMock = vi.fn();
 const rateLimitMock = vi.fn();
 const assertRemoteMock = vi.fn();
+
+const { compositeMock, resolveProductMock } = vi.hoisted(() => ({
+  compositeMock: vi.fn(),
+  resolveProductMock: vi.fn(async (productUrl: string) => productUrl),
+}));
 
 vi.mock("@/lib/ai/claude-agent", () => {
   class MockClaudeAgent {
@@ -29,6 +33,7 @@ vi.mock("@/lib/blob-storage", () => ({
 
 vi.mock("@/lib/image-utils", () => ({
   compositeProductOnBackground: compositeMock,
+  resolveProductUrlForComposite: resolveProductMock,
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -43,11 +48,14 @@ vi.mock("@/lib/remote-image", () => ({
 
 describe("POST /api/generate", () => {
   beforeEach(() => {
+    vi.resetModules();
+    process.env.REPLICATE_VARIANT_SPACING_MS = "0";
     optimizePromptMock.mockReset();
     generateVariantsMock.mockReset();
     generateImageMock.mockReset();
     uploadImageMock.mockReset();
     compositeMock.mockReset();
+    resolveProductMock.mockReset();
     rateLimitMock.mockReset();
     assertRemoteMock.mockReset();
   });
@@ -110,5 +118,13 @@ describe("POST /api/generate", () => {
     expect(body.data.generations[0]?.imageUrl).toContain("blob.example");
     expect(rateLimitMock).toHaveBeenCalled();
     expect(assertRemoteMock).toHaveBeenCalledWith("https://example.com/product.png");
+    expect(resolveProductMock).toHaveBeenCalledWith(
+      "https://example.com/product.png",
+      expect.any(Function),
+    );
+    expect(compositeMock).toHaveBeenCalledWith(
+      "https://example.com/product.png",
+      "https://replicate.example/one.png",
+    );
   });
 });

@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { ClaudeAgent } from "@/lib/ai/claude-agent";
 import { ImageGenerator } from "@/lib/ai/image-generator";
 import { errorResponse } from "@/lib/api-response";
+import { uploadImage } from "@/lib/blob-storage";
 import { corsHeaders, jsonResponse, withCors } from "@/lib/cors";
 import { assertRemoteImageWithinMaxBytes } from "@/lib/remote-image";
 import { ANALYZE_LIMIT, checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
@@ -43,8 +44,24 @@ export async function POST(request: Request): Promise<Response> {
 
     let isolatedImageUrl: string | undefined;
     if (removeBackground) {
-      const generator = new ImageGenerator();
-      isolatedImageUrl = await generator.removeBackground(imageUrl);
+      try {
+        const generator = new ImageGenerator();
+        const dataUrl = await generator.removeBackground(imageUrl);
+        // dataUrl is data:image/png;base64,… — upload to blob so the client
+        // receives a public HTTPS URL it can pass back to /api/generate.
+        const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64, "base64");
+        isolatedImageUrl = await uploadImage(buffer, "isolated-product.png", "uploads");
+      } catch (err) {
+        console.warn(
+          JSON.stringify({
+            event: "analyze_remove_background_failed",
+            timestamp: new Date().toISOString(),
+            imageUrlHash: imageHash,
+            error: String(err),
+          }),
+        );
+      }
     }
 
     console.info(
