@@ -307,7 +307,13 @@ Write one short friendly sentence (max 35 words) acknowledging what you will do 
             case "regenerate": {
               const gen = new ImageGenerator();
               const regenModel = orchestration.model_choice === "flux-schnell" ? "flux-schnell" : "flux-pro";
-              const regenPrompt = orchestration.background_prompt || iteration.parameters.modifiedPrompt;
+              const modifiedPrompt =
+                iteration.type === "regenerate" &&
+                "modifiedPrompt" in iteration.parameters &&
+                typeof iteration.parameters.modifiedPrompt === "string"
+                  ? iteration.parameters.modifiedPrompt
+                  : undefined;
+              const regenPrompt = orchestration.background_prompt || modifiedPrompt || userMessage;
               const urls = await gen.generate(regenPrompt, regenModel, {
                 aspectRatio: orchestration.render_specs.aspect_ratio,
               });

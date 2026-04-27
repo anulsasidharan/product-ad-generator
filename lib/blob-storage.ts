@@ -57,8 +57,8 @@ export async function uploadImage(
       }
 
       // Private blob stores reject explicit `access: "public"`.
-      // Retry with default store access so local/dev uploads still work.
-      return put(path, buffer, { token });
+      // Retry as private so strict `PutCommandOptions` typing is satisfied.
+      return put(path, buffer, { token, access: "private" });
     }
   });
 
