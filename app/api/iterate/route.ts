@@ -6,7 +6,12 @@ import { ImageGenerator } from "@/lib/ai/image-generator";
 import { errorResponse } from "@/lib/api-response";
 import { uploadImage } from "@/lib/blob-storage";
 import { corsHeaders, jsonResponse, withCors } from "@/lib/cors";
-import { addTextOverlay, adjustColorTemperature, compositeProductOnBackground } from "@/lib/image-utils";
+import {
+  addTextOverlay,
+  adjustColorTemperature,
+  compositeProductOnBackground,
+  resolveProductUrlForComposite,
+} from "@/lib/image-utils";
 import { ITERATE_LIMIT, checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
 import type { ConversationTurn, GenerationState, IterationAction } from "@/lib/types";
 import { IterateInputSchema } from "@/lib/validation";
@@ -137,7 +142,9 @@ Write one short friendly sentence (max 35 words) acknowledging what you will do 
             }
             case "reposition_product": {
               if (productImageUrl && backgroundUrl) {
-                const buf = await compositeProductOnBackground(productImageUrl, backgroundUrl, {
+                const gen = new ImageGenerator();
+                const cutout = await resolveProductUrlForComposite(productImageUrl, (u) => gen.removeBackground(u));
+                const buf = await compositeProductOnBackground(cutout, backgroundUrl, {
                   position: {
                     x: Math.max(0, Math.min(1, iteration.parameters.position.x)),
                     y: Math.max(0, Math.min(1, iteration.parameters.position.y)),
@@ -165,7 +172,8 @@ Write one short friendly sentence (max 35 words) acknowledging what you will do 
                 throw new Error("Regeneration produced no image");
               }
               if (productImageUrl) {
-                const buf = await compositeProductOnBackground(productImageUrl, bg);
+                const cutout = await resolveProductUrlForComposite(productImageUrl, (u) => gen.removeBackground(u));
+                const buf = await compositeProductOnBackground(cutout, bg);
                 resultUrl = await uploadImage(buf, "iterate-regenerate.png", "generated");
               } else {
                 resultUrl = bg;

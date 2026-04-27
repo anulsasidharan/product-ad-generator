@@ -5,13 +5,18 @@ import { ImageGenerator } from "@/lib/ai/image-generator";
 import { ApiError, errorResponse } from "@/lib/api-response";
 import { uploadImage } from "@/lib/blob-storage";
 import { corsHeaders, jsonResponse, withCors } from "@/lib/cors";
-import { compositeProductOnBackground } from "@/lib/image-utils";
+import { compositeProductOnBackground, resolveProductUrlForComposite } from "@/lib/image-utils";
 import { assertRemoteImageWithinMaxBytes } from "@/lib/remote-image";
 import { checkRateLimit, GENERATE_LIMIT, getClientIdentifier } from "@/lib/rate-limit";
 import type { Generation, ProductContext } from "@/lib/types";
 import { GenerateInputSchema } from "@/lib/validation";
 
 const FLUX_COST = 0.003;
+/** Space between variant runs so Replicate low-credit tiers (~6 creates/min, burst 1) do not 429. Override with REPLICATE_VARIANT_SPACING_MS. */
+const BETWEEN_VARIANTS_DELAY_MS = (() => {
+  const n = Number.parseInt(process.env.REPLICATE_VARIANT_SPACING_MS ?? "11000", 10);
+  return Number.isFinite(n) && n >= 0 ? n : 11_000;
+})();
 
 function buildGenerationSuggestions(productContext: ProductContext) {
   return {
@@ -58,14 +63,34 @@ export async function POST(request: Request): Promise<Response> {
     const agent = new ClaudeAgent();
     const generator = new ImageGenerator();
 
+    let productForComposite: string;
+    try {
+      productForComposite = await resolveProductUrlForComposite(productImageUrl, (url) =>
+        generator.removeBackground(url),
+      );
+    } catch (err) {
+      console.error("Background removal failed:", String(err));
+      throw new ApiError(
+        "Background removal is temporarily unavailable. Please try again in a few seconds.",
+        503,
+        "BACKGROUND_REMOVAL_FAILED",
+      );
+    }
+
     const { optimizedPrompt, suggestedModel } = await agent.optimizePrompt(userPrompt, productContext);
-    const modelKey = model ?? suggestedModel;
-    const effectiveModel = modelKey === "flux-pro" ? "flux-pro" : "flux-schnell";
+    const modelKey = model ?? suggestedModel ?? "flux-pro";
+    const effectiveModel = modelKey === "flux-schnell" ? "flux-schnell" : "flux-pro";
 
     const plans = await agent.generateVariants(optimizedPrompt, productContext, variantCount);
 
-    const settled = await Promise.allSettled(
-      plans.map(async (plan, index) => {
+    const generations: Generation[] = [];
+    let firstFailure: unknown = null;
+    for (let index = 0; index < plans.length; index++) {
+      const plan = plans[index];
+      if (!plan) {
+        continue;
+      }
+      try {
         const t0 = Date.now();
         const urls = await generator.generate(plan.prompt, effectiveModel, {
           aspectRatio: aspectRatio ?? "1:1",
@@ -76,7 +101,7 @@ export async function POST(request: Request): Promise<Response> {
         if (!backgroundUrl) {
           throw new Error("No image URL returned");
         }
-        const composite = await compositeProductOnBackground(productImageUrl, backgroundUrl);
+        const composite = await compositeProductOnBackground(productForComposite, backgroundUrl);
         const publicUrl = await uploadImage(composite, `variant-${index + 1}.png`, "generated");
         const generation: Generation = {
           id: randomUUID(),
@@ -90,20 +115,23 @@ export async function POST(request: Request): Promise<Response> {
             cost: FLUX_COST,
           },
         };
-        return generation;
-      }),
-    );
+        generations.push(generation);
+      } catch (error) {
+        if (firstFailure === null) {
+          firstFailure = error;
+        }
+        console.error("Variant generation failed:", error);
+      }
 
-    const generations: Generation[] = [];
-    for (const result of settled) {
-      if (result.status === "fulfilled") {
-        generations.push(result.value);
-      } else {
-        console.error("Variant generation failed:", result.reason);
+      if (index < plans.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, BETWEEN_VARIANTS_DELAY_MS));
       }
     }
 
     if (generations.length === 0) {
+      if (firstFailure instanceof ApiError) {
+        throw firstFailure;
+      }
       throw new ApiError("All variant generations failed", 500, "GENERATION_FAILED");
     }
 

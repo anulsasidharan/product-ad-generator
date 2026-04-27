@@ -41,10 +41,10 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigat
 
 export function PromptInput({ productContext, onGenerate, suggestions, isGenerating }: PromptInputProps) {
   const [prompt, setPrompt] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(true);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
-  const [variants, setVariants] = useState(3);
-  const [model, setModel] = useState<GenerationModelChoice>("auto");
+  const [variants, setVariants] = useState(1);
+  const [model, setModel] = useState<GenerationModelChoice>("flux-pro");
 
   const debouncedPrompt = useDebounced(prompt, 280);
 

@@ -96,6 +96,7 @@ export const GenerateResponseSchema = z.object({
     })
     .optional(),
   error: z.string().optional(),
+  code: z.string().optional(),
 });
 
 export const AnalyzeResponseSchema = z.object({

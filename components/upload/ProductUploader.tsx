@@ -58,7 +58,7 @@ export function ProductUploader({
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl }),
+        body: JSON.stringify({ imageUrl, removeBackground: true }),
       });
       const payload = (await res.json()) as { success?: boolean; data?: ProductAnalysis; error?: string };
       if (!res.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Analysis failed");
