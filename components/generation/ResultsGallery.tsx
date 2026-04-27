@@ -7,17 +7,45 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import type { Generation } from "@/lib/types";
+import type { Generation, OrchestrationSummary } from "@/lib/types";
 
 interface ResultsGalleryProps {
   generations: Generation[];
   originalProductUrl: string;
   onRegenerate: (generationId: string) => void;
+  orchestration?: OrchestrationSummary | null;
 }
 
 function modelLabel(model: string): string {
+  if (model === "ideogram" || model.includes("ideogram")) return "Ideogram";
   if (model.includes("flux-pro") || model === "flux-pro") return "Flux Pro";
   return "Flux Schnell";
+}
+
+function strategyLabel(strategy: string): string {
+  switch (strategy) {
+    case "modify":
+      return "Modify";
+    case "reuse_background":
+      return "Reuse background";
+    case "new":
+      return "New scene";
+    default:
+      return strategy;
+  }
+}
+
+function strategyHelp(strategy: string): string {
+  switch (strategy) {
+    case "modify":
+      return "Tweaks color, lighting, text, or placement without rebuilding the scene.";
+    case "reuse_background":
+      return "Keeps the same scene while adjusting product/layout details.";
+    case "new":
+      return "Builds a brand-new background scene for bigger creative changes.";
+    default:
+      return "Uses orchestration to choose the safest edit path.";
+  }
 }
 
 async function downloadImage(imageUrl: string, format: "png" | "jpeg" | "webp", filename: string): Promise<void> {
@@ -50,7 +78,12 @@ async function downloadImage(imageUrl: string, format: "png" | "jpeg" | "webp", 
   URL.revokeObjectURL(url);
 }
 
-export function ResultsGallery({ generations, originalProductUrl, onRegenerate }: ResultsGalleryProps) {
+export function ResultsGallery({
+  generations,
+  originalProductUrl,
+  onRegenerate,
+  orchestration,
+}: ResultsGalleryProps) {
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [slider, setSlider] = useState(50);
 
@@ -81,6 +114,70 @@ export function ResultsGallery({ generations, originalProductUrl, onRegenerate }
 
   return (
     <div className="w-full space-y-3">
+      {orchestration && (
+        <div className="rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-950/40 to-zinc-950/80 p-4 ring-1 ring-violet-500/15">
+          <div className="flex items-center gap-2 border-b border-white/[0.08] pb-2 mb-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/20 text-violet-300 text-xs font-bold">
+              AI
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-white">Creative director plan</p>
+              <p className="text-[11px] text-zinc-400">How this run was interpreted before images were generated.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-300">
+            {orchestration.traceId && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 py-0.5 hover:bg-white/[0.1]"
+                onClick={() =>
+                  void navigator.clipboard
+                    .writeText(orchestration.traceId!)
+                    .then(() => toast.success("Trace ID copied"))
+                    .catch(() => toast.error("Could not copy trace ID"))
+                }
+              >
+                <Copy className="h-3 w-3" aria-hidden />
+                Trace: {orchestration.traceId}
+              </button>
+            )}
+            <span className="rounded-full bg-white/[0.05] px-2 py-0.5">Type: {orchestration.adType}</span>
+            <span className="rounded-full bg-white/[0.05] px-2 py-0.5">
+              Strategy: {strategyLabel(orchestration.generationStrategy)}
+            </span>
+            <span className="rounded-full bg-white/[0.05] px-2 py-0.5">
+              Platform: {orchestration.targetPlatform}
+            </span>
+            <span className="rounded-full bg-white/[0.05] px-2 py-0.5">Tone: {orchestration.tone}</span>
+            {orchestration.modelChoice && (
+              <span className="rounded-full bg-white/[0.05] px-2 py-0.5">
+                Model: {orchestration.modelChoice}
+                {orchestration.resolvedModel && orchestration.modelChoice !== orchestration.resolvedModel
+                  ? ` -> ${orchestration.resolvedModel}`
+                  : ""}
+              </span>
+            )}
+            {orchestration.topEditOperation && (
+              <span className="rounded-full bg-white/[0.05] px-2 py-0.5">
+                Action: {orchestration.topEditOperation}
+              </span>
+            )}
+            {typeof orchestration.intentConfidence === "number" && (
+              <span className="rounded-full bg-white/[0.05] px-2 py-0.5">
+                Intent confidence: {(orchestration.intentConfidence * 100).toFixed(0)}%
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-zinc-500">
+            {strategyHelp(orchestration.generationStrategy)}
+          </p>
+          {orchestration.fallbackApplied && (
+            <p className="mt-1 text-xs text-amber-400/90">
+              Fallback applied: {orchestration.fallbackReason ?? "model or orchestration fallback"}
+            </p>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {generations.map((g, index) => (
           <motion.div key={g.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>

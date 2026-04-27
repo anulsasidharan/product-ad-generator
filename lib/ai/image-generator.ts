@@ -6,6 +6,7 @@ import type { ImageModelKey } from "@/lib/types";
 
 const FLUX_SCHNELL = "black-forest-labs/flux-schnell";
 const FLUX_PRO = "black-forest-labs/flux-pro";
+const IDEOGRAM_DEFAULT = "ideogram-ai/ideogram-v2";
 
 /** Replicate `Prefer: wait` can block longer than a quick poll; keep under typical serverless ceilings. */
 const GENERATION_TIMEOUT_MS = 120_000;
@@ -233,21 +234,35 @@ export class ImageGenerator {
       seed?: number;
     },
   ): Promise<string[]> {
-    const replicateModel = model === "flux-pro" ? FLUX_PRO : FLUX_SCHNELL;
+    const replicateModel =
+      model === "flux-pro"
+        ? FLUX_PRO
+        : model === "ideogram"
+          ? process.env.IDEOGRAM_REPLICATE_MODEL ?? IDEOGRAM_DEFAULT
+          : FLUX_SCHNELL;
     const aspectRatio = options?.aspectRatio ?? "1:1";
     const numOutputs = options?.numOutputs ?? 1;
 
     const runOnce = async () => {
+      const ideogramInput =
+        model === "ideogram"
+          ? {
+              prompt,
+              aspect_ratio: aspectRatio,
+              num_images: numOutputs,
+              ...(options?.seed !== undefined ? { seed: options.seed } : {}),
+            }
+          : {
+              prompt,
+              aspect_ratio: aspectRatio,
+              num_outputs: numOutputs,
+              output_format: "png",
+              output_quality: 90,
+              ...(options?.seed !== undefined ? { seed: options.seed } : {}),
+            };
       const output = await withTimeout(
         this.replicate.run(replicateModel as `${string}/${string}`, {
-          input: {
-            prompt,
-            aspect_ratio: aspectRatio,
-            num_outputs: numOutputs,
-            output_format: "png",
-            output_quality: 90,
-            ...(options?.seed !== undefined ? { seed: options.seed } : {}),
-          },
+          input: ideogramInput,
         }),
         GENERATION_TIMEOUT_MS,
         "Image generation",
