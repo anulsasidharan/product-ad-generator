@@ -1,6 +1,7 @@
 "use client";
 
 import { ImagePlus, LayoutGrid, PenTool, Sparkles } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -15,8 +16,10 @@ import type {
   ConversationTurn,
   Generation,
   GenerationOptions,
+  OrchestrationSummary,
   ProductAnalysis,
 } from "@/lib/types";
+import { parseOrchestrationSummary } from "@/lib/orchestration-from-response";
 import { GenerateResponseSchema } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -58,8 +61,10 @@ export default function EditorPage() {
     options: GenerationOptions;
   } | null>(null);
   const [chatByGenId, setChatByGenId] = useState<Record<string, ConversationTurn[]>>({});
+  const [refineHistoryByGenId, setRefineHistoryByGenId] = useState<Record<string, string[]>>({});
   const [, setCanvasStateByGenId] = useState<Record<string, CanvasState>>({});
   const [generating, setGenerating] = useState(false);
+  const [orchestrationSummary, setOrchestrationSummary] = useState<OrchestrationSummary | null>(null);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -121,6 +126,9 @@ export default function EditorPage() {
             },
             variants: targetIndex !== undefined ? 1 : options.variants,
             aspectRatio: options.aspectRatio,
+            creativeMode: options.creativeMode,
+            subjectHint: options.subjectHint,
+            customSubjectHint: options.customSubjectHint,
             ...(options.model !== "auto" ? { model: options.model } : {}),
           }),
         });
@@ -130,24 +138,47 @@ export default function EditorPage() {
         if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.data?.generations?.length) {
           const body = parsed.success ? parsed.data : null;
           const code = body?.code;
+          const traceId = body?.data?.metadata?.traceId;
           let errorMsg =
             body?.error ?? "Generation failed";
           if (code === "PROVIDER_QUOTA_EXCEEDED") {
             errorMsg =
               `${errorMsg} Add credits at replicate.com/account#billing or set a valid REPLICATE_API_TOKEN.`;
           }
+          if (traceId) {
+            errorMsg = `${errorMsg} (trace ${traceId})`;
+          }
           throw new Error(errorMsg);
         }
 
         const newGenerations = parsed.data.data.generations;
+        const traceId = parsed.data.data.metadata?.traceId;
+        const orchestration = parseOrchestrationSummary(
+          parsed.data.data.metadata?.orchestration,
+          traceId,
+        );
+        setOrchestrationSummary(orchestration);
         if (targetIndex !== undefined && newGenerations[0]) {
+          const replacement = newGenerations[0];
           setGenerations((prev) =>
-            prev.map((g, i) => (i === targetIndex ? newGenerations[0]! : g)),
+            prev.map((g, i) => (i === targetIndex ? replacement! : g)),
           );
+          if (replacement) {
+            const replacedId = generations[targetIndex]?.id;
+            if (replacedId) {
+              setRefineHistoryByGenId((prev) => ({
+                ...prev,
+                [replacedId]: [replacement.imageUrl],
+              }));
+            }
+          }
         } else {
           setGenerations(newGenerations);
+          setRefineHistoryByGenId(
+            Object.fromEntries(newGenerations.map((g) => [g.id, [g.imageUrl]])),
+          );
         }
-        toast.success("Generations ready");
+        toast.success(traceId ? `Generations ready (trace ${traceId})` : "Generations ready");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Generation failed");
       } finally {
@@ -181,6 +212,40 @@ export default function EditorPage() {
     [analysis, generations, lastRequest, remoteUrl, runGenerate],
   );
 
+  const handleGenerationImageUpdate = useCallback((generationId: string, nextImageUrl: string) => {
+    setGenerations((prev) => {
+      const target = prev.find((g) => g.id === generationId);
+      if (!target || target.imageUrl === nextImageUrl) {
+        return prev;
+      }
+      setRefineHistoryByGenId((history) => {
+        const existing = history[generationId] ?? [target.imageUrl];
+        if (existing[existing.length - 1] === nextImageUrl) {
+          return history;
+        }
+        return {
+          ...history,
+          [generationId]: [...existing, nextImageUrl],
+        };
+      });
+      return prev.map((g) => (g.id === generationId ? { ...g, imageUrl: nextImageUrl } : g));
+    });
+  }, []);
+
+  const selectedRefineHistory = selectedGeneration
+    ? (refineHistoryByGenId[selectedGeneration.id] ?? [selectedGeneration.imageUrl])
+    : [];
+
+  const handleRestoreRefineVersion = useCallback(
+    (generationId: string, imageUrl: string) => {
+      setGenerations((prev) =>
+        prev.map((g) => (g.id === generationId ? { ...g, imageUrl } : g)),
+      );
+      toast.success("Restored refine version");
+    },
+    [],
+  );
+
   const syncChatHistory = useCallback(
     (genId: string, turns: ConversationTurn[]) => {
       setChatByGenId((m) => ({ ...m, [genId]: turns }));
@@ -202,6 +267,20 @@ export default function EditorPage() {
   );
 
   const effectiveProductUrl = isolatedUrl ?? remoteUrl;
+  const recommendedOptions = useMemo<Partial<GenerationOptions> | undefined>(() => {
+    if (!orchestrationSummary) {
+      return undefined;
+    }
+    return {
+      aspectRatio: orchestrationSummary.aspectRatio,
+      model:
+        orchestrationSummary.resolvedModel === "flux-schnell"
+          ? "flux-schnell"
+          : orchestrationSummary.resolvedModel === "flux-pro"
+            ? "flux-pro"
+            : undefined,
+    };
+  }, [orchestrationSummary]);
 
   return (
     <main className="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10">
@@ -240,6 +319,7 @@ export default function EditorPage() {
                 suggestions={suggestionStrings}
                 onGenerate={(p, o) => void handleGenerate(p, o)}
                 isGenerating={generating}
+                recommendedOptions={recommendedOptions}
               />
             ) : (
               <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.02] p-6 text-center">
@@ -283,7 +363,58 @@ export default function EditorPage() {
             generations={generations}
             originalProductUrl={remoteUrl}
             onRegenerate={(id) => void handleRegenerate(id)}
+            orchestration={orchestrationSummary}
           />
+          {selectedGeneration && selectedRefineHistory.length > 1 && (
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Refine history</p>
+                <p className="text-[11px] text-zinc-600">
+                  {selectedRefineHistory.length} versions
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selectedRefineHistory.map((url, idx) => {
+                  const isActive = selectedGeneration.imageUrl === url;
+                  return (
+                    <button
+                      key={`${selectedGeneration.id}-${idx}`}
+                      type="button"
+                      className={cn(
+                        "group relative w-[84px] overflow-hidden rounded-lg border text-left transition-all",
+                        isActive
+                          ? "border-violet-500/70 ring-2 ring-violet-500/30"
+                          : "border-white/[0.08] hover:border-white/[0.2]",
+                      )}
+                      onClick={() => handleRestoreRefineVersion(selectedGeneration.id, url)}
+                      aria-label={`Restore ${idx === 0 ? "original" : `refine ${idx}`}`}
+                    >
+                      <div className="relative aspect-square bg-zinc-900">
+                        <Image
+                          src={url}
+                          alt=""
+                          fill
+                          className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                          sizes="84px"
+                          unoptimized
+                        />
+                      </div>
+                      <div
+                        className={cn(
+                          "border-t px-2 py-1 text-[10px]",
+                          isActive
+                            ? "border-violet-500/40 bg-violet-500/15 text-violet-200"
+                            : "border-white/[0.08] bg-white/[0.03] text-zinc-400",
+                        )}
+                      >
+                        {idx === 0 ? "Original" : `Refine ${idx}`}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -302,8 +433,10 @@ export default function EditorPage() {
               key={selectedGeneration.id}
               generation={selectedGeneration}
               productImageUrl={effectiveProductUrl}
+              orchestration={orchestrationSummary}
               conversationHistory={chatTurnsForSelected}
               isProcessing={generating}
+              onImageUpdate={(imageUrl) => handleGenerationImageUpdate(selectedGeneration.id, imageUrl)}
               onHistoryChange={(turns) => syncChatHistory(selectedGeneration.id, turns)}
             />
           </div>

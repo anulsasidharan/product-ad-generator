@@ -4,7 +4,14 @@ import { Loader2, Settings2, Sparkles, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { AspectRatio, GenerationModelChoice, GenerationOptions, ProductContext } from "@/lib/types";
+import type {
+  AspectRatio,
+  CreativeMode,
+  GenerationModelChoice,
+  GenerationOptions,
+  ProductContext,
+  SubjectHint,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface PromptInputProps {
@@ -12,6 +19,7 @@ interface PromptInputProps {
   onGenerate: (prompt: string, options: GenerationOptions) => void;
   suggestions: string[];
   isGenerating: boolean;
+  recommendedOptions?: Partial<GenerationOptions>;
 }
 
 function contextualChips(productContext: ProductContext): string[] {
@@ -39,12 +47,33 @@ function useDebounced<T>(value: T, ms: number): T {
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
-export function PromptInput({ productContext, onGenerate, suggestions, isGenerating }: PromptInputProps) {
+export function PromptInput({
+  productContext,
+  onGenerate,
+  suggestions,
+  isGenerating,
+  recommendedOptions,
+}: PromptInputProps) {
   const [prompt, setPrompt] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(true);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
-  const [variants, setVariants] = useState(1);
-  const [model, setModel] = useState<GenerationModelChoice>("flux-pro");
+  const [variants, setVariants] = useState(3);
+  const [model, setModel] = useState<GenerationModelChoice>("auto");
+  const [creativeMode, setCreativeMode] = useState<CreativeMode>("in-use-lifestyle");
+  const [subjectHint, setSubjectHint] = useState<SubjectHint>("auto");
+  const [customSubjectHint, setCustomSubjectHint] = useState("");
+
+  useEffect(() => {
+    if (!recommendedOptions) {
+      return;
+    }
+    if (recommendedOptions.aspectRatio) {
+      setAspectRatio(recommendedOptions.aspectRatio);
+    }
+    if (recommendedOptions.model) {
+      setModel(recommendedOptions.model);
+    }
+  }, [recommendedOptions?.aspectRatio, recommendedOptions?.model]);
 
   const debouncedPrompt = useDebounced(prompt, 280);
 
@@ -57,8 +86,15 @@ export function PromptInput({ productContext, onGenerate, suggestions, isGenerat
   const handleGenerate = useCallback(() => {
     const trimmed = prompt.trim();
     if (!trimmed || isGenerating) return;
-    onGenerate(trimmed, { aspectRatio, variants, model });
-  }, [aspectRatio, isGenerating, model, onGenerate, prompt, variants]);
+    onGenerate(trimmed, {
+      aspectRatio,
+      variants,
+      model,
+      creativeMode,
+      subjectHint,
+      customSubjectHint: subjectHint === "custom" ? customSubjectHint.trim() : undefined,
+    });
+  }, [aspectRatio, creativeMode, customSubjectHint, isGenerating, model, onGenerate, prompt, subjectHint, variants]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -165,12 +201,66 @@ export function PromptInput({ productContext, onGenerate, suggestions, isGenerat
                 Model
               </label>
               <select id="model-select" className={selectClass} value={model} onChange={(e) => setModel(e.target.value as GenerationModelChoice)} disabled={isGenerating}>
-                <option value="auto">Auto</option>
+                <option value="auto">Auto (follow orchestration)</option>
                 <option value="flux-schnell">Flux Schnell</option>
                 <option value="flux-pro">Flux Pro</option>
+                <option value="ideogram">Ideogram</option>
               </select>
             </div>
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600" htmlFor="creative-mode">
+                Creative mode
+              </label>
+              <select
+                id="creative-mode"
+                className={selectClass}
+                value={creativeMode}
+                onChange={(e) => setCreativeMode(e.target.value as CreativeMode)}
+                disabled={isGenerating}
+              >
+                <option value="in-use-lifestyle">In-use lifestyle (person using/wearing)</option>
+                <option value="studio-product-only">Studio product-only</option>
+              </select>
+            </div>
+            <div className="space-y-1 sm:col-span-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600" htmlFor="subject-hint">
+                Subject hint
+              </label>
+              <select
+                id="subject-hint"
+                className={selectClass}
+                value={subjectHint}
+                onChange={(e) => setSubjectHint(e.target.value as SubjectHint)}
+                disabled={isGenerating || creativeMode === "studio-product-only"}
+              >
+                <option value="auto">Auto by product type</option>
+                <option value="athlete">Athlete</option>
+                <option value="fashion-model">Fashion model</option>
+                <option value="hands-only">Hands-only user</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            {subjectHint === "custom" && creativeMode !== "studio-product-only" && (
+              <div className="space-y-1 sm:col-span-3">
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600" htmlFor="custom-subject-hint">
+                  Custom subject hint
+                </label>
+                <input
+                  id="custom-subject-hint"
+                  value={customSubjectHint}
+                  onChange={(e) => setCustomSubjectHint(e.target.value)}
+                  disabled={isGenerating}
+                  placeholder="e.g., male trail runner, close-up on legs"
+                  className={selectClass}
+                />
+              </div>
+            )}
           </div>
+        )}
+        {recommendedOptions && (
+          <p className="text-xs text-zinc-500">
+            Recommended defaults synced from the latest orchestration plan.
+          </p>
         )}
       </div>
 

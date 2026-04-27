@@ -9,6 +9,7 @@ Turn any product photo into polished, campaign-ready ad creatives with a single 
 - **Smart product analysis** — Claude Vision identifies the product category, style, colours, and materials and suggests creative directions automatically.
 - **Natural-language generation** — describe a vibe in plain English ("summer beach", "luxury hotel lobby") and get up to three campaign-ready variants in seconds.
 - **Multi-model image generation** — routes to FLUX Schnell (fast) or FLUX Pro (quality) on Replicate, with DALL-E 3 as an optional fallback.
+- **Capability-based model routing** — orchestration can request Ideogram for typography-heavy ads; runtime uses Ideogram when enabled, otherwise transparently falls back to Flux with explicit metadata.
 - **Conversational refinement** — iterate via the chat panel ("make it warmer", "add a headline") without regenerating from scratch. Streams reasoning and results in real time via Server-Sent Events.
 - **Canvas editor** — Fabric.js canvas with layer management, text overlays, undo/redo, zoom, and one-click export to PNG / JPG / WebP.
 - **Variant-specific regeneration** — regenerate a single variant without touching the others.
@@ -120,6 +121,10 @@ UPSTASH_REDIS_TOKEN=...
 
 # Optional — override the background-removal model
 # REPLICATE_BG_MODEL=cjwbw/rembg
+
+# Optional — enable Ideogram routing via Replicate
+# IDEOGRAM_ENABLED=true
+# IDEOGRAM_REPLICATE_MODEL=ideogram-ai/ideogram-v2
 ```
 
 > The app falls back to an in-memory rate limiter when Upstash credentials are absent, so Redis is not required for local development.
@@ -194,7 +199,18 @@ Generates up to three ad image variants from a natural-language prompt.
       "reasoning": "...",
       "parameters": { "style": "lifestyle", "lighting": "natural", "composition": "wide" },
       "metadata": { "generationTime": 4200, "cost": 0.003 }
-    }]
+    }],
+    "metadata": {
+      "traceId": "uuid",
+      "totalGenerationTime": 4200,
+      "modelUsed": "flux-schnell",
+      "orchestration": {
+        "modelChoice": "ideogram",
+        "resolvedModel": "flux-pro",
+        "fallbackApplied": true,
+        "fallbackReason": "ideogram_capability_disabled_using_flux_fallback"
+      }
+    }
   }
 }
 ```
@@ -218,7 +234,7 @@ Processes a conversational refinement request and streams back thinking, actions
 **Streamed events**
 ```
 data: {"type":"thinking","content":"I'll adjust the colour temperature..."}
-data: {"type":"result","imageUrl":"https://...","explanation":"...","clarify":false}
+data: {"type":"result","traceId":"uuid","imageUrl":"https://...","explanation":"...","clarify":false}
 ```
 
 ---
@@ -229,7 +245,7 @@ Uploads an image file (multipart/form-data) to Vercel Blob and returns a public 
 
 ### `GET /api/health`
 
-Returns `{"status":"ok","timestamp":"..."}`. Used for uptime monitoring.
+Returns runtime capability diagnostics, e.g. `ideogramEnabled`, `replicateConfigured`, `ideogramModel`, and warning flags when model configuration is inconsistent.
 
 ---
 
